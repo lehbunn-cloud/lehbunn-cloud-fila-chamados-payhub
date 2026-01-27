@@ -1,13 +1,12 @@
-// Configuração do Firebase
-// ATENÇÃO: Substitua estas configurações pelas suas próprias
+// ATENÇÃO: Substitua estas configurações pelas do SEU projeto Firebase
 const firebaseConfig = {
-    apiKey: "SUA_API_KEY_AQUI",
-    authDomain: "SEU_PROJETO.firebaseapp.com",
-    projectId: "SEU_PROJETO_ID",
-    storageBucket: "SEU_PROJETO.appspot.com",
-    messagingSenderId: "SEU_SENDER_ID",
-    appId: "SEU_APP_ID",
-    measurementId: "SEU_MEASUREMENT_ID"
+    apiKey: "AIzaSyA1wB9c6fXJ7XvYqQqQqQqQqQqQqQqQqQqQ",
+    authDomain: "lehburn-cloud-fila-chamados-payhub.firebaseapp.com",
+    projectId: "lehburn-cloud-fila-chamados-payhub",
+    storageBucket: "lehburn-cloud-fila-chamados-payhub.appspot.com",
+    messagingSenderId: "123456789012",
+    appId: "1:123456789012:web:abcdef1234567890abcdef",
+    measurementId: "G-ABCDEF1234"
 };
 
 // Inicializar Firebase
