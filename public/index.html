@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Fila de Chamados - Payhub</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
+    <!-- CSS Local -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Cabeçalho -->
+        <div class="header">
+            <h1>
+                <i class="fas fa-headset"></i>
+                Portal de Fila de Chamados - Payhub
+            </h1>
+            <p>Sistema de gerenciamento de atendimento da equipe N1/N2</p>
+            <div class="auth-status" id="authStatus">
+                <button class="btn btn-small" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Entrar
+                </button>
+            </div>
+        </div>
+        
+        <!-- Painel de tempo -->
+        <div class="time-panel">
+            <div class="time-info">
+                <i class="fas fa-clock" style="font-size: 24px;"></i>
+                <div class="time-text">
+                    <div class="time-date" id="currentDate">Carregando data...</div>
+                    <div class="time-clock" id="currentTime">Carregando hora...</div>
+                </div>
+            </div>
+            <div id="simulationIndicator" class="simulation-indicator" style="display: none;">
+                <i class="fas fa-magic"></i>
+                Horário simulado
+            </div>
+        </div>
+        
+        <!-- Grid principal -->
+        <div class="main-grid">
+            <!-- Fila de atendimento -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-list-ol"></i>
+                    Fila de Atendimento - N1
+                </div>
+                <div id="queueList">
+                    <!-- Lista de analistas será gerada via JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Clientes especiais -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-star"></i>
+                    Clientes Especiais
+                </div>
+                <div id="specialCases">
+                    <!-- Casos especiais serão gerados via JavaScript -->
+                </div>
+                
+                <!-- Informações -->
+                <div style="margin-top: 24px; padding: 16px; background-color: var(--sp-gray-light); border-radius: 8px;">
+                    <div style="font-weight: 600; color: var(--sp-text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-info-circle"></i>
+                        Como funciona
+                    </div>
+                    <ul style="list-style-type: none; padding-left: 0; font-size: 13px; color: var(--sp-text-secondary);">
+                        <li style="margin-bottom: 6px; display: flex; align-items: flex-start; gap: 8px;">
+                            <i class="fas fa-check-circle" style="color: var(--sp-green); margin-top: 2px;"></i>
+                            <span>Clientes especiais são direcionados automaticamente</span>
+                        </li>
+                        <li style="margin-bottom: 6px; display: flex; align-items: flex-start; gap: 8px;">
+                            <i class="fas fa-sync-alt" style="color: var(--sp-blue); margin-top: 2px;"></i>
+                            <span>Eric participa da fila normal exceto para casos TIM</span>
+                        </li>
+                        <li style="display: flex; align-items: flex-start; gap: 8px;">
+                            <i class="fas fa-history" style="color: var(--sp-yellow); margin-top: 2px;"></i>
+                            <span>Fila reinicia após 7 chamados ou no dia seguinte</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Estatísticas -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalTickets">0</div>
+                <div class="stat-label">Chamados Hoje</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeAnalysts">0</div>
+                <div class="stat-label">Analistas Ativos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="nextInQueue">-</div>
+                <div class="stat-label">Próximo na Fila</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="specialTickets">0</div>
+                <div class="stat-label">Casos Especiais</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="waitingTickets">0</div>
+                <div class="stat-label">Aguardando Cliente</div>
+            </div>
+        </div>
+        
+        <!-- Painel de controles -->
+        <div class="controls-grid">
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-plus-circle"></i>
+                    Novo Chamado
+                </div>
+                <div class="control-group">
+                    <input type="text" id="newTicketNumber" class="input-field" placeholder="Número do chamado (ou deixe em branco para gerar automático)">
+                    <select id="ticketType" class="input-field">
+                        <option value="normal">Chamado Normal</option>
+                        <option value="TIM">Cliente TIM (Eric)</option>
+                        <option value="DPSP">Cliente DPSP (Tamiris)</option>
+                        <option value="Benoit">Cliente Benoit (André)</option>
+                    </select>
+                    <button class="btn btn-success" id="addTicketBtn">
+                        <i class="fas fa-plus"></i>
+                        Adicionar Chamado
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-cogs"></i>
+                    Controles da Fila
+                </div>
+                <div class="control-group">
+                    <button class="btn" id="nextAnalystBtn">
+                        <i class="fas fa-forward"></i>
+                        Próximo Analista
+                    </button>
+                    <button class="btn btn-warning" id="resetQueueBtn">
+                        <i class="fas fa-redo-alt"></i>
+                        Reiniciar Fila do Dia
+                    </button>
+                    <button class="btn btn-danger" id="freeAllBtn">
+                        <i class="fas fa-user-check"></i>
+                        Liberar Todos
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-clock"></i>
+                    Simulação de Horário
+                </div>
+                <div class="control-group">
+                    <button class="btn" id="simulateTimeBtn">
+                        <i class="fas fa-magic"></i>
+                        Simular Horário
+                    </button>
+                    <button class="btn btn-warning" id="realTimeBtn" style="display: none;">
+                        <i class="fas fa-clock"></i>
+                        Voltar ao Horário Real
+                    </button>
+                    <div class="last-reset" id="lastResetInfo"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Rodapé -->
+        <div class="footer">
+            <p><strong>Portal de Fila de Chamados - Equipe Payhub</strong> | Desenvolvido para uso interno</p>
+            <p>Última atualização: <span id="lastUpdate">--:--:--</span></p>
+            <p class="last-reset">Fila reiniciada em: <span id="lastResetDate"></span></p>
+        </div>
+    </div>
+    
+    <!-- Modal para simulação de horário -->
+    <div id="timeSimulationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-clock"></i>
+                    Simular Horário
+                </div>
+                <button class="close-modal" id="closeTimeModal">&times;</button>
+            </div>
+            
+            <p style="margin-bottom: 20px; color: var(--sp-text-secondary); font-size: 14px;">
+                Selecione um horário para simular o comportamento da fila:
+            </p>
+            
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px;">
+                <button class="btn time-option" data-hour="7">7:00</button>
+                <button class="btn time-option" data-hour="8">8:00</button>
+                <button class="btn time-option" data-hour="9">9:00</button>
+                <button class="btn time-option" data-hour="10">10:00</button>
+                <button class="btn time-option" data-hour="14">14:00</button>
+                <button class="btn time-option" data-hour="18">18:00</button>
+                <button class="btn time-option" data-hour="22">22:00</button>
+                <button class="btn time-option" data-hour="23">23:00</button>
+            </div>
+            
+            <div style="background-color: var(--sp-gray-light); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="font-weight: 600; color: var(--sp-text-primary); margin-bottom: 12px;">Horários de Expediente:</div>
+                <div style="font-size: 13px; color: var(--sp-text-secondary); display: flex; flex-direction: column; gap: 6px;">
+                    <div><i class="far fa-clock" style="width: 16px;"></i> 8h-17h: Eric, Jonathan</div>
+                    <div><i class="far fa-clock" style="width: 16px;"></i> 9h-18h: Carolina, Cristiane, Tamiris</div>
+                    <div><i class="far fa-clock" style="width: 16px;"></i> 14h-23h: Sander, Yan</div>
+                    <div><i class="far fa-clock" style="width: 16px;"></i> 8h-18h: André, Felipe (N2)</div>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn btn-danger" id="cancelSimulation">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </button>
+                <button class="btn btn-success" id="applySimulation">
+                    <i class="fas fa-check"></i>
+                    Aplicar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Login -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Login - Portal Payhub
+                </div>
+                <button class="close-modal" id="closeLoginModal">&times;</button>
+            </div>
+            
+            <div class="control-group">
+                <input type="email" id="loginEmail" class="input-field" placeholder="E-mail" autocomplete="email">
+                <input type="password" id="loginPassword" class="input-field" placeholder="Senha" autocomplete="current-password">
+                
+                <button class="btn btn-success" id="doLoginBtn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Entrar
+                </button>
+                
+                <div style="text-align: center; margin-top: 16px; color: var(--sp-text-secondary); font-size: 13px;">
+                    Apenas usuários autorizados podem acessar o sistema
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="firebase-config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
