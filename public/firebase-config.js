@@ -1,4 +1,4 @@
-// ATENÇÃO: Substitua estas configurações pelas do SEU projeto Firebase
+// Configurações do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCJXxaG8R5-VmkoGA7PyFcyfcvBAk92yTc",
   authDomain: "portal-fila-payhub.firebaseapp.com",
@@ -8,17 +8,16 @@ const firebaseConfig = {
   appId: "1:28871537008:web:38d6ac22721f40a7d61fb5"
 };
 
-// Inicializar Firebase
-const app = initializeApp(firebaseConfig);
-
-// Referências do Firebase
-const db = firebase.firestore();
-const auth = firebase.auth();
-
-// Exportar para uso em outros arquivos
-window.firebaseApp = {
-    db: db,
-    auth: auth,
-    firebase: firebase
-};
-
+// Firebase já foi inicializado automaticamente pelo SDK
+// Verificar se firebase está disponível
+if (typeof firebase !== 'undefined') {
+    // Criar referências
+    window.firebaseApp = {
+        db: firebase.firestore(),
+        auth: firebase.auth(),
+        firebase: firebase
+    };
+    console.log("✅ Firebase configurado!");
+} else {
+    console.error("❌ Firebase não carregou!");
+}
