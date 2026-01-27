@@ -138,4 +138,175 @@ function saveDataToFirestore() {
     
     const dataToSave = {
         ...state,
-        simulatedTime: state.sim
+        simulatedTime: state.simulatedTime ? state.simulatedTime.getTime() : null,
+        analysts: analysts,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: state.currentUser.email
+    };
+    
+    // Salvar no Firestore
+    firebaseApp.db.collection('queueState').doc('currentState').set(dataToSave)
+        .then(() => {
+            console.log('Dados salvos no Firestore');
+        })
+        .catch((error) => {
+            console.error('Erro ao salvar no Firestore:', error);
+        });
+}
+
+function loadDataFromFirestore() {
+    if (!state.currentUser) return;
+    
+    firebaseApp.db.collection('queueState').doc('currentState').get()
+        .then((doc) => {
+            if (doc.exists) {
+                const data = doc.data();
+                
+                // Restaurar estado
+                state.ticketsToday = data.ticketsToday || 0;
+                state.specialTicketsToday = data.specialTicketsToday || 0;
+                state.waitingTicketsToday = data.waitingTicketsToday || 0;
+                state.lastReset = data.lastReset || new Date().toLocaleDateString('pt-BR');
+                state.currentAnalystIndex = data.currentAnalystIndex || 0;
+                state.nextTicketNumber = data.nextTicketNumber || 1000;
+                state.dailyResetDone = data.dailyResetDone || false;
+                
+                if (data.simulatedTime) {
+                    state.simulatedTime = new Date(data.simulatedTime);
+                }
+                
+                // Restaurar analistas
+                if (data.analysts) {
+                    data.analysts.forEach(savedAnalyst => {
+                        const analyst = analysts.find(a => a.id === savedAnalyst.id);
+                        if (analyst) {
+                            Object.assign(analyst, savedAnalyst);
+                        }
+                    });
+                }
+                
+                updateQueueOrder();
+                updateQueueDisplay();
+                updateSpecialCasesDisplay();
+                updateStatistics();
+                
+                showNotification('Dados carregados do servidor', 'info');
+            }
+        })
+        .catch((error) => {
+            console.error('Erro ao carregar do Firestore:', error);
+        });
+}
+
+function saveAnalystState(analyst) {
+    if (!state.currentUser) return;
+    
+    firebaseApp.db.collection('analystLogs').add({
+        analystId: analyst.id,
+        analystName: analyst.name,
+        action: analyst.currentTicket ? 'ticket_assigned' : 'freed',
+        ticketNumber: analyst.currentTicket,
+        ticketStatus: analyst.ticketStatus,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        user: state.currentUser.email
+    });
+}
+
+function saveTicketLog(ticketNumber, action, analystName) {
+    if (!state.currentUser) return;
+    
+    firebaseApp.db.collection('ticketLogs').add({
+        ticketNumber: ticketNumber,
+        action: action,
+        analystName: analystName,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        user: state.currentUser.email
+    });
+}
+
+// ============================================
+// FUNÇÕES PRINCIPAIS (mantidas do código original)
+// ============================================
+
+// Aqui você deve copiar todas as funções do código original
+// que estão depois da inicialização:
+// updateCurrentTime, updateAnalystAvailability, updateQueueOrder,
+// updateQueueDisplay, createAnalystCardHTML, getStatusDotClass,
+// getClientNameFromTicket, attachAnalystCardEvents,
+// updateSpecialCasesDisplay, updateStatistics, handleNewTicket,
+// handleNormalTicket, handleSpecialTicket, assignTicketToAnalyst,
+// setTicketWaiting, resumeTicket, finishTicket, freeAllAnalysts,
+// nextAnalyst, resetQueue, checkDailyReset, openTimeSimulationModal,
+// closeTimeSimulationModal, applyTimeSimulation, returnToRealTime,
+// updateApp, updateLastUpdateTime, showNotification, saveState, loadState
+
+// Nota: Substitua as chamadas a saveState() por saveDataToFirestore()
+// e as chamadas a loadState() por loadDataFromFirestore()
+
+// ============================================
+// EVENT LISTENERS (atualizados)
+// ============================================
+
+function setupEventListeners() {
+    // Login
+    document.getElementById('doLoginBtn').addEventListener('click', login);
+    document.getElementById('closeLoginModal').addEventListener('click', function() {
+        document.getElementById('loginModal').style.display = 'none';
+    });
+    
+    // Botões principais
+    document.getElementById('addTicketBtn').addEventListener('click', handleNewTicket);
+    document.getElementById('nextAnalystBtn').addEventListener('click', nextAnalyst);
+    document.getElementById('resetQueueBtn').addEventListener('click', resetQueue);
+    document.getElementById('freeAllBtn').addEventListener('click', freeAllAnalysts);
+    document.getElementById('simulateTimeBtn').addEventListener('click', openTimeSimulationModal);
+    document.getElementById('realTimeBtn').addEventListener('click', returnToRealTime);
+    
+    // Modal de simulação
+    document.getElementById('closeTimeModal').addEventListener('click', closeTimeSimulationModal);
+    document.getElementById('cancelSimulation').addEventListener('click', closeTimeSimulationModal);
+    document.getElementById('applySimulation').addEventListener('click', applyTimeSimulation);
+    
+    // Opções de horário
+    document.querySelectorAll('.time-option').forEach(button => {
+        button.addEventListener('click', function() {
+            document.querySelectorAll('.time-option').forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+    
+    // Enter no campo de ticket
+    document.getElementById('newTicketNumber').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleNewTicket();
+        }
+    });
+    
+    // Fechar modais com ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.style.display = 'none';
+            });
+        }
+    });
+}
+
+// ============================================
+// INICIALIZAÇÃO DO APP
+// ============================================
+
+function initializeApp() {
+    updateCurrentTime();
+    updateAnalystAvailability();
+    updateQueueOrder();
+    updateQueueDisplay();
+    updateSpecialCasesDisplay();
+    updateStatistics();
+    updateLastUpdateTime();
+    checkDailyReset();
+}
+
+// Exportar para uso global (se necessário)
+window.appState = state;
+window.analysts = analysts;
