@@ -2,8 +2,9 @@
 // PORTAL DE FILA DE CHAMADOS - PAYHUB
 // ============================================
 // app.js - Lógica principal da aplicação
-// Versão: 2.0.0
+// Versão: 2.1.0
 // Data: 2024
+// CORREÇÃO: Problema de foco nos inputs resolvido
 
 // ============================================
 // CONFIGURAÇÃO GLOBAL
@@ -168,7 +169,9 @@ let appState = {
     nextTicketNumber: 1000,
     dailyResetDone: false,
     isInitialized: false,
-    autoRefreshInterval: null
+    autoRefreshInterval: null,
+    // NOVO: Controlar qual input tem foco
+    focusedInputId: null
 };
 
 // Cache para melhor performance
@@ -248,10 +251,10 @@ function setupAutoRefresh() {
         clearInterval(appState.autoRefreshInterval);
     }
     
-    // Atualizar a cada minuto
+    // Atualizar a cada 30 segundos (em vez de 60)
     appState.autoRefreshInterval = setInterval(() => {
         updateApp();
-    }, 60000); // 60 segundos
+    }, 30000);
     
     // Atualizar tempo a cada segundo (para o relógio)
     setInterval(() => {
@@ -296,19 +299,23 @@ function setupEventListeners() {
             });
         });
         
-        // Permitir Enter no campo de número do chamado - CORRIGIDO
+        // Permitir Enter no campo de número do chamado
         const ticketNumberInput = document.getElementById('newTicketNumber');
         if (ticketNumberInput) {
             ticketNumberInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    console.log('Enter pressionado no campo de ticket');
                     handleNewTicket();
                 }
             });
-        } else {
-            console.error('❌ Campo newTicketNumber não encontrado!');
         }
+        
+        // Salvar qual input tem foco antes de atualizar a tela
+        document.addEventListener('focusin', function(e) {
+            if (e.target.classList.contains('assign-ticket-input')) {
+                appState.focusedInputId = e.target.getAttribute('data-analyst-id');
+            }
+        });
         
         // Fechar modais ao clicar fora
         document.addEventListener('click', function(event) {
@@ -402,9 +409,6 @@ function updateCurrentTime() {
             if (realTimeBtn) realTimeBtn.style.display = 'none';
         }
         
-        // Atualizar disponibilidade dos analistas
-        updateAnalystAvailability();
-        
     } catch (error) {
         console.error('❌ Erro ao atualizar hora:', error);
     }
@@ -454,7 +458,8 @@ function updateAnalystAvailability() {
     
     // Atualizar interface
     updateQueueOrder();
-    updateQueueDisplay();
+    // Usar a nova função que preserva o foco
+    updateQueueDisplayPreservingFocus();
     updateSpecialCasesDisplay();
     updateStatistics();
     
@@ -463,7 +468,7 @@ function updateAnalystAvailability() {
 }
 
 // ============================================
-// FUNÇÕES DA FILA
+// FUNÇÕES DA FILA - CORRIGIDAS
 // ============================================
 
 function updateQueueOrder() {
@@ -508,9 +513,19 @@ function updateQueueOrder() {
     }
 }
 
-function updateQueueDisplay() {
+// NOVA FUNÇÃO: Atualiza a fila preservando o foco nos inputs
+function updateQueueDisplayPreservingFocus() {
     const queueList = document.getElementById('queueList');
     if (!queueList) return;
+    
+    // Salvar valores dos inputs antes de atualizar
+    const inputValues = {};
+    document.querySelectorAll('.assign-ticket-input').forEach(input => {
+        const analystId = input.getAttribute('data-analyst-id');
+        if (analystId) {
+            inputValues[analystId] = input.value;
+        }
+    });
     
     const queueAnalysts = window.analysts.filter(a => a.level === "N1" && a.inQueue);
     
@@ -578,8 +593,32 @@ function updateQueueDisplay() {
     // Atualizar o DOM
     queueList.innerHTML = queueHTML;
     
+    // Restaurar valores dos inputs
+    Object.keys(inputValues).forEach(analystId => {
+        const input = document.querySelector(`.assign-ticket-input[data-analyst-id="${analystId}"]`);
+        if (input) {
+            input.value = inputValues[analystId];
+        }
+    });
+    
+    // Restaurar foco se necessário
+    if (appState.focusedInputId) {
+        setTimeout(() => {
+            const focusedInput = document.querySelector(`.assign-ticket-input[data-analyst-id="${appState.focusedInputId}"]`);
+            if (focusedInput) {
+                focusedInput.focus();
+                focusedInput.select();
+            }
+        }, 10);
+    }
+    
     // Adicionar eventos aos botões
     attachAnalystCardEvents();
+}
+
+// Função original mantida para compatibilidade
+function updateQueueDisplay() {
+    updateQueueDisplayPreservingFocus();
 }
 
 function createAnalystCardHTML(analyst, status) {
@@ -645,15 +684,18 @@ function createAnalystCardHTML(analyst, status) {
             </div>
         `;
     } else {
+        // Adicionar classe específica para facilitar seleção
         ticketControls = `
-            <input type="text" class="input-field assign-ticket-input" 
-                   placeholder="Nº Chamado" 
-                   data-analyst-id="${analyst.id}"
-                   title="Digite o número do chamado"
-                   style="font-size: 12px; padding: 6px 10px;">
-            <button class="btn btn-small assign-ticket-btn" data-analyst-id="${analyst.id}" title="Atribuir chamado">
-                <i class="fas fa-paperclip"></i> Atribuir
-            </button>
+            <div class="ticket-assign-controls" data-analyst-id="${analyst.id}">
+                <input type="text" class="input-field assign-ticket-input" 
+                       placeholder="Nº Chamado" 
+                       data-analyst-id="${analyst.id}"
+                       title="Digite o número do chamado"
+                       style="font-size: 12px; padding: 6px 10px;">
+                <button class="btn btn-small assign-ticket-btn" data-analyst-id="${analyst.id}" title="Atribuir chamado">
+                    <i class="fas fa-paperclip"></i> Atribuir
+                </button>
+            </div>
         `;
     }
     
@@ -796,24 +838,20 @@ function attachAnalystCardEvents() {
 }
 
 // ============================================
-// FUNÇÕES DE TICKETS - CORRIGIDO
+// FUNÇÕES DE TICKETS - CORRIGIDAS
 // ============================================
 
 function handleNewTicket() {
     try {
-        console.log('handleNewTicket chamada');
-        
         const ticketNumberInput = document.getElementById('newTicketNumber');
         const ticketTypeSelect = document.getElementById('ticketType');
         
         if (!ticketNumberInput) {
-            console.error('❌ Campo newTicketNumber não encontrado');
             showNotification('Erro: campo não encontrado', 'error');
             return;
         }
         
         if (!ticketTypeSelect) {
-            console.error('❌ Select ticketType não encontrado');
             showNotification('Erro: tipo de chamado não encontrado', 'error');
             return;
         }
@@ -821,15 +859,11 @@ function handleNewTicket() {
         let ticketNumber = ticketNumberInput.value.trim();
         const ticketType = ticketTypeSelect.value;
         
-        console.log('Ticket número:', ticketNumber);
-        console.log('Ticket tipo:', ticketType);
-        
         // Validação básica
         if (!ticketNumber) {
             // Gerar número automático se não informado
             ticketNumber = `CH-${appState.nextTicketNumber}`;
             appState.nextTicketNumber++;
-            console.log('Ticket gerado automaticamente:', ticketNumber);
         } else if (ticketNumber.length < 3) {
             showNotification('Número do chamado muito curto', 'warning');
             ticketNumberInput.focus();
@@ -892,8 +926,6 @@ function isTicketAlreadyExists(ticketNumber) {
 }
 
 function handleNormalTicket(ticketNumber) {
-    console.log('Processando ticket normal:', ticketNumber);
-    
     if (appState.queueOrder.length === 0) {
         showNotification('Nenhum analista disponível na fila!', 'warning');
         return false;
@@ -928,8 +960,6 @@ function handleNormalTicket(ticketNumber) {
 }
 
 function handleSpecialTicket(ticketNumber, ticketType) {
-    console.log('Processando ticket especial:', ticketNumber, ticketType);
-    
     const specialClient = window.specialClients.find(c => 
         ticketType === 'TIM' ? c.client === 'TIM' :
         ticketType === 'DPSP' ? c.client === 'DPSP' :
@@ -993,9 +1023,9 @@ function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus
         analyst.inQueue = false;
     }
     
-    // Atualizar interface
+    // Atualizar interface com preservação de foco
     updateQueueOrder();
-    updateQueueDisplay();
+    updateQueueDisplayPreservingFocus();
     updateSpecialCasesDisplay();
     updateStatistics();
     
@@ -1023,7 +1053,7 @@ function setTicketWaiting(analystId) {
         updateQueueOrder();
     }
     
-    updateQueueDisplay();
+    updateQueueDisplayPreservingFocus();
     updateSpecialCasesDisplay();
     updateStatistics();
     
@@ -1046,7 +1076,7 @@ function resumeTicket(analystId) {
         updateQueueOrder();
     }
     
-    updateQueueDisplay();
+    updateQueueDisplayPreservingFocus();
     updateSpecialCasesDisplay();
     updateStatistics();
     
@@ -1078,7 +1108,7 @@ function finishTicket(analystId) {
     }
     
     updateQueueOrder();
-    updateQueueDisplay();
+    updateQueueDisplayPreservingFocus();
     updateSpecialCasesDisplay();
     updateStatistics();
     
@@ -1097,7 +1127,7 @@ function nextAnalyst() {
     }
     
     appState.currentAnalystIndex = (appState.currentAnalystIndex + 1) % appState.queueOrder.length;
-    updateQueueDisplay();
+    updateQueueDisplayPreservingFocus();
     updateStatistics();
     
     const currentAnalyst = appState.queueOrder[appState.currentAnalystIndex];
@@ -1131,7 +1161,7 @@ function resetQueue() {
     appState.nextTicketNumber = 1000;
     
     updateQueueOrder();
-    updateQueueDisplay();
+    updateQueueDisplayPreservingFocus();
     updateSpecialCasesDisplay();
     updateStatistics();
     
@@ -1158,7 +1188,7 @@ function freeAllAnalysts() {
     });
     
     updateQueueOrder();
-    updateQueueDisplay();
+    updateQueueDisplayPreservingFocus();
     updateSpecialCasesDisplay();
     updateStatistics();
     
@@ -1616,7 +1646,7 @@ function loadStateFromLocalStorage() {
             }
             
             updateQueueOrder();
-            updateQueueDisplay();
+            updateQueueDisplayPreservingFocus();
             updateSpecialCasesDisplay();
             updateStatistics();
             
@@ -1631,7 +1661,7 @@ function loadStateFromLocalStorage() {
 
 function exportBackup() {
     const backup = {
-        version: '2.0.0',
+        version: '2.1.0',
         timestamp: new Date().toISOString(),
         appState: appState,
         analysts: window.analysts,
@@ -1682,7 +1712,7 @@ function importBackup(file) {
             // Atualizar interface
             updateCurrentTime();
             updateQueueOrder();
-            updateQueueDisplay();
+            updateQueueDisplayPreservingFocus();
             updateSpecialCasesDisplay();
             updateStatistics();
             
@@ -1713,7 +1743,7 @@ window.appController = {
     // Funções principais
     updateCurrentTime,
     updateAnalystAvailability,
-    updateQueueDisplay,
+    updateQueueDisplayPreservingFocus,
     updateStatistics,
     
     // Controles de tickets
@@ -1744,4 +1774,4 @@ window.appController = {
     loadStateFromLocalStorage
 };
 
-console.log('✅ app.js carregado com sucesso');
+console.log('✅ app.js v2.1.0 carregado com sucesso - Problema de foco corrigido');
