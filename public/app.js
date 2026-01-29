@@ -1440,22 +1440,20 @@ function enableAppControls() {
 // ============================================
 
 function showNotification(message, type = 'success') {
-    // Verificar se a função já existe (pode estar no Firebase integration)
-    if (typeof window.firebaseAppIntegration?.showNotification === 'function') {
-        window.firebaseAppIntegration.showNotification(message, type);
-        return;
-    }
-    
-    // Implementação local...
+    // IMPLEMENTAÇÃO LOCAL DIRETA - SEM VERIFICAÇÕES
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+        <i class="fas fa-${type === 'success' ? 'check-circle' : 
+                         type === 'warning' ? 'exclamation-triangle' : 
+                         type === 'error' ? 'exclamation-circle' : 
+                         'info-circle'}"></i>
         <span>${message}</span>
     `;
     
     document.body.appendChild(notification);
     
+    // Remover após 5 segundos
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => {
@@ -1464,6 +1462,10 @@ function showNotification(message, type = 'success') {
             }
         }, 300);
     }, 5000);
+}
+
+function showError(message) {
+    showNotification(message, 'error');
 }
 
 function showError(message) {
@@ -1654,4 +1656,5 @@ window.appController = {
 };
 
 console.log('✅ app.js carregado com sucesso');
+
 
