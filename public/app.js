@@ -287,13 +287,19 @@ function setupEventListeners() {
             });
         });
         
-        // Permitir Enter no campo de número do chamado
-document.getElementById('newTicketNumber').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault(); // ← ADICIONAR ESTA LINHA
-        handleNewTicket();
-    }
-});
+        // Permitir Enter no campo de número do chamado - CORRIGIDO
+        const ticketNumberInput = document.getElementById('newTicketNumber');
+        if (ticketNumberInput) {
+            ticketNumberInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    console.log('Enter pressionado no campo de ticket');
+                    handleNewTicket();
+                }
+            });
+        } else {
+            console.error('❌ Campo newTicketNumber não encontrado!');
+        }
         
         // Fechar modais ao clicar fora
         document.addEventListener('click', function(event) {
@@ -307,7 +313,11 @@ document.getElementById('newTicketNumber').addEventListener('keypress', function
             // Ctrl + N = Novo ticket
             if (e.ctrlKey && e.key === 'n') {
                 e.preventDefault();
-                document.getElementById('newTicketNumber').focus();
+                const input = document.getElementById('newTicketNumber');
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
             }
             
             // Ctrl + F = Liberar todos
@@ -500,7 +510,7 @@ function updateQueueDisplay() {
             <div class="analyst-card offline">
                 <div class="analyst-info">
                     <div class="analyst-name">Nenhum analista configurado</div>
-                    <div style="font-size: 13px; color: var(--sp-text-secondary); margin-top: 8px;">
+                    <div style="font-size: 13px; color: #666; margin-top: 8px;">
                         Configure os horários dos analistas no sistema.
                     </div>
                 </div>
@@ -753,52 +763,73 @@ function attachAnalystCardEvents() {
 }
 
 // ============================================
-// FUNÇÕES DE TICKETS
+// FUNÇÕES DE TICKETS - CORRIGIDO
 // ============================================
 
 function handleNewTicket() {
-    const ticketNumberInput = document.getElementById('newTicketNumber');
-    const ticketTypeSelect = document.getElementById('ticketType');
-    
-    if (!ticketNumberInput || !ticketTypeSelect) {
-        showNotification('Elementos do formulário não encontrados', 'error');
-        return;
+    try {
+        console.log('handleNewTicket chamada');
+        
+        const ticketNumberInput = document.getElementById('newTicketNumber');
+        const ticketTypeSelect = document.getElementById('ticketType');
+        
+        if (!ticketNumberInput) {
+            console.error('❌ Campo newTicketNumber não encontrado');
+            showNotification('Erro: campo não encontrado', 'error');
+            return;
+        }
+        
+        if (!ticketTypeSelect) {
+            console.error('❌ Select ticketType não encontrado');
+            showNotification('Erro: tipo de chamado não encontrado', 'error');
+            return;
+        }
+        
+        let ticketNumber = ticketNumberInput.value.trim();
+        const ticketType = ticketTypeSelect.value;
+        
+        console.log('Ticket número:', ticketNumber);
+        console.log('Ticket tipo:', ticketType);
+        
+        // Validação básica
+        if (!ticketNumber) {
+            // Gerar número automático se não informado
+            ticketNumber = `CH-${appState.nextTicketNumber}`;
+            appState.nextTicketNumber++;
+            console.log('Ticket gerado automaticamente:', ticketNumber);
+        } else if (ticketNumber.length < 3) {
+            showNotification('Número do chamado muito curto', 'warning');
+            ticketNumberInput.focus();
+            ticketNumberInput.select();
+            return;
+        }
+        
+        // Verificar se ticket já existe
+        if (isTicketAlreadyExists(ticketNumber)) {
+            showNotification(`Chamado ${ticketNumber} já está em atendimento`, 'warning');
+            ticketNumberInput.focus();
+            ticketNumberInput.select();
+            return;
+        }
+        
+        // Processar chamado
+        if (ticketType !== 'normal') {
+            handleSpecialTicket(ticketNumber, ticketType);
+        } else {
+            handleNormalTicket(ticketNumber);
+        }
+        
+        // Limpar campo e dar foco novamente
+        ticketNumberInput.value = '';
+        ticketNumberInput.focus();
+        
+        // Salvar estado
+        saveStateToLocalStorage();
+        
+    } catch (error) {
+        console.error('❌ Erro em handleNewTicket:', error);
+        showNotification('Erro ao processar chamado: ' + error.message, 'error');
     }
-    
-    let ticketNumber = ticketNumberInput.value.trim();
-    const ticketType = ticketTypeSelect.value;
-    
-    // Validação básica
-    if (ticketNumber && ticketNumber.length < 3) {
-        showNotification('Número do chamado muito curto', 'warning');
-        return;
-    }
-    
-    // Gerar número automático se não informado
-    if (!ticketNumber) {
-        ticketNumber = `CH-${appState.nextTicketNumber}`;
-        appState.nextTicketNumber++;
-    }
-    
-    // Verificar se ticket já existe
-    if (isTicketAlreadyExists(ticketNumber)) {
-        showNotification(`Chamado ${ticketNumber} já está em atendimento`, 'warning');
-        return;
-    }
-    
-    // Processar chamado
-    if (ticketType !== 'normal') {
-        handleSpecialTicket(ticketNumber, ticketType);
-    } else {
-        handleNormalTicket(ticketNumber);
-    }
-    
-    // Limpar campo
-    ticketNumberInput.value = '';
-    ticketNumberInput.focus();
-    
-    // Salvar estado
-    saveStateToLocalStorage();
 }
 
 function isTicketAlreadyExists(ticketNumber) {
@@ -809,6 +840,8 @@ function isTicketAlreadyExists(ticketNumber) {
 }
 
 function handleNormalTicket(ticketNumber) {
+    console.log('Processando ticket normal:', ticketNumber);
+    
     if (appState.queueOrder.length === 0) {
         showNotification('Nenhum analista disponível na fila!', 'warning');
         return;
@@ -839,6 +872,8 @@ function handleNormalTicket(ticketNumber) {
 }
 
 function handleSpecialTicket(ticketNumber, ticketType) {
+    console.log('Processando ticket especial:', ticketNumber, ticketType);
+    
     const specialClient = window.specialClients.find(c => 
         ticketType === 'TIM' ? c.client === 'TIM' :
         ticketType === 'DPSP' ? c.client === 'DPSP' :
@@ -1441,7 +1476,7 @@ function enableAppControls() {
 // ============================================
 
 function showNotification(message, type = 'success') {
-    // IMPLEMENTAÇÃO LOCAL DIRETA - SEM VERIFICAÇÕES
+    // Criar elemento de notificação
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.innerHTML = `
@@ -1463,10 +1498,6 @@ function showNotification(message, type = 'success') {
             }
         }, 300);
     }, 5000);
-}
-
-function showError(message) {
-    showNotification(message, 'error');
 }
 
 function showError(message) {
@@ -1657,6 +1688,3 @@ window.appController = {
 };
 
 console.log('✅ app.js carregado com sucesso');
-
-
-
