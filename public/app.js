@@ -288,11 +288,12 @@ function setupEventListeners() {
         });
         
         // Permitir Enter no campo de número do chamado
-        document.getElementById('newTicketNumber').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                handleNewTicket();
-            }
-        });
+document.getElementById('newTicketNumber').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault(); // ← ADICIONAR ESTA LINHA
+        handleNewTicket();
+    }
+});
         
         // Fechar modais ao clicar fora
         document.addEventListener('click', function(event) {
@@ -1656,5 +1657,6 @@ window.appController = {
 };
 
 console.log('✅ app.js carregado com sucesso');
+
 
 
