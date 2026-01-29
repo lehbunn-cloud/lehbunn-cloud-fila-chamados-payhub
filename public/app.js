@@ -2,10 +2,13 @@
 // PORTAL DE FILA DE CHAMADOS - PAYHUB
 // ============================================
 // app.js - Lógica principal da aplicação
-// Versão: 3.3.1
+// Versão: 3.3.2
 // Data: 2024
 // ATUALIZAÇÃO: Sistema unificado com colunas de status e lógica de retorno à fila
-// CORREÇÕES: Otimização de renderização para evitar perda de foco nos inputs
+// CORREÇÕES: 
+// 1. Corrigido problema do cursor sumindo
+// 2. Corrigido analistas não aparecendo na coluna "Em Atendimento"
+// 3. Todos os controles habilitados
 
 // ============================================
 // CONFIGURAÇÃO GLOBAL
@@ -208,7 +211,7 @@ let cache = {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Inicializando Portal de Fila Payhub v3.3.1...');
+    console.log('🚀 Inicializando Portal de Fila Payhub v3.3.2...');
     
     // Primeiro: remover o modal de login (temporário para testes)
     const loginModal = document.getElementById('loginModal');
@@ -245,7 +248,7 @@ function initializeApp() {
         
         appState.isInitialized = true;
         
-        console.log('✅ Aplicação v3.3.1 inicializada com sucesso');
+        console.log('✅ Aplicação v3.3.2 inicializada com sucesso');
         
         // Focar no input principal
         setTimeout(() => {
@@ -258,7 +261,7 @@ function initializeApp() {
         
         // Mostrar notificação de inicialização
         setTimeout(() => {
-            showNotification('Sistema de fila v3.3.1 carregado', 'success');
+            showNotification('Sistema de fila v3.3.2 carregado', 'success');
         }, 1000);
         
     } catch (error) {
@@ -281,7 +284,7 @@ function createAnalystStatusColumns() {
     // Atualizar status dos analistas primeiro
     updateAnalystStatusFlags();
     
-    // Filtrar analistas
+    // Filtrar analistas CORRETAMENTE
     const availableAnalysts = window.analysts.filter(a => 
         a.level === "N1" && 
         a.isAvailable && 
@@ -290,10 +293,12 @@ function createAnalystStatusColumns() {
         !a.isWaitingForClient
     );
     
+    // CRÍTICO: Corrigido o filtro de analistas ocupados
     const busyAnalysts = window.analysts.filter(a => 
         a.level === "N1" && 
         a.isAvailable && 
-        ((a.isBusy && !a.isWaitingForClient) || (a.currentTicket && !a.isWaitingForClient))
+        (a.isBusy || a.currentTicket) && // Qualquer um que está ocupado OU tem ticket
+        !a.isWaitingForClient // Mas não está aguardando cliente
     );
     
     const waitingAnalysts = window.analysts.filter(a => 
@@ -438,6 +443,7 @@ function createAnalystCardHTML(analyst, status) {
     let statusClass = '';
     let ticketInfo = '';
     let quickAssignHTML = '';
+    let statusIndicatorHTML = '';
     
     // Recuperar valor do input se existir
     const savedInputValue = appState.activeInputs.quickAssignInputs[analyst.id] || '';
@@ -461,6 +467,17 @@ function createAnalystCardHTML(analyst, status) {
                 </button>
             </div>
         `;
+        
+        statusIndicatorHTML = `
+            <div class="status-indicator-column">
+                <span class="status-dot-column ${statusClass}"></span>
+                <span class="status-text-column">${statusText}</span>
+            </div>
+            <div class="tickets-count-column">
+                <small style="color: #666;">${analyst.ticketsHandled} chamados hoje</small>
+            </div>
+        `;
+        
     } else if (status === 'busy') {
         statusText = 'EM ATENDIMENTO';
         statusClass = 'busy';
@@ -485,6 +502,16 @@ function createAnalystCardHTML(analyst, status) {
                 </div>
             `;
         }
+        
+        statusIndicatorHTML = `
+            <div class="status-indicator-column">
+                <span class="status-dot-column ${statusClass}"></span>
+                <span class="status-text-column">${statusText}</span>
+            </div>
+            <div class="tickets-count-column">
+                <small style="color: #666;">${analyst.ticketsHandled} chamados hoje</small>
+            </div>
+        `;
     }
     
     return `
@@ -503,13 +530,7 @@ function createAnalystCardHTML(analyst, status) {
             ${ticketInfo}
             
             <div class="analyst-status-column">
-                <div class="status-indicator-column">
-                    <span class="status-dot-column ${statusClass}"></span>
-                    <span class="status-text-column">${statusText}</span>
-                </div>
-                <div class="tickets-count-column">
-                    <small style="color: #666;">${analyst.ticketsHandled} chamados hoje</small>
-                </div>
+                ${statusIndicatorHTML}
             </div>
             
             ${quickAssignHTML}
@@ -530,19 +551,28 @@ function updateAnalystStatusFlags() {
         // Atualizar disponibilidade baseada no horário
         analyst.isAvailable = (currentTime >= analyst.startTime && currentTime < analyst.endTime);
         
-        // Atualizar status de ocupação
+        // Atualizar status de ocupação CORRETAMENTE
         if (analyst.ticketStatus === 'aguardando-cliente') {
+            // Se está aguardando cliente
             analyst.isBusy = false;
             analyst.isWaitingForClient = true;
             analyst.inQueue = true; // Retorna à fila quando aguardando
         } else if (analyst.ticketStatus === 'atendendo' || analyst.currentTicket) {
+            // Se está atendendo ou tem ticket (CRÍTICO: corrigido)
             analyst.isBusy = true;
             analyst.isWaitingForClient = false;
             analyst.inQueue = false; // Sai da fila quando atendendo
         } else {
+            // Disponível
             analyst.isBusy = false;
             analyst.isWaitingForClient = false;
             analyst.inQueue = analyst.level === "N1"; // Entra na fila se for N1
+        }
+        
+        // Garantir consistência: se tem ticket, está ocupado
+        if (analyst.currentTicket && !analyst.isWaitingForClient) {
+            analyst.isBusy = true;
+            analyst.ticketStatus = analyst.ticketStatus || 'atendendo';
         }
     });
 }
@@ -779,9 +809,11 @@ function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus
         }
     }
     
+    // CRÍTICO: Garantir que o analista seja marcado como ocupado
     analyst.isBusy = true;
     analyst.isWaitingForClient = false;
     analyst.inQueue = false; // Sai da fila quando atendendo
+    analyst.ticketStatus = ticketStatus; // Definir status explicitamente
     
     if (ticketType !== 'normal' || isThisAnalystSpecialClient) {
         // É um cliente especial
@@ -798,7 +830,6 @@ function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus
         analyst.ticketSpecialType = null;
     }
     
-    analyst.ticketStatus = ticketStatus;
     analyst.lastActivity = new Date();
     analyst.ticketsHandled++;
     
@@ -807,12 +838,11 @@ function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus
         appState.ticketsToday++;
     }
     
-    // Atualizar interface de forma otimizada
+    // Atualizar interface COMPLETAMENTE
+    updateQueueOrder();
     updateStatistics();
     updateSpecialCasesDisplay();
-    
-    // Atualizar apenas os cards afetados
-    updateAnalystCard(analystId);
+    createAnalystStatusColumns(); // Recriar colunas para refletir mudança
     
     // Salvar no Firebase se disponível
     if (window.firebaseAppIntegration?.saveTicketToFirebase) {
@@ -821,43 +851,6 @@ function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus
     
     // Salvar localmente
     saveStateToLocalStorage();
-}
-
-// ============================================
-// FUNÇÃO: Atualizar card específico do analista
-// ============================================
-
-function updateAnalystCard(analystId) {
-    const analyst = window.analysts.find(a => a.id === analystId);
-    if (!analyst) return;
-    
-    // Determinar status do analista
-    let status = '';
-    if (analyst.isWaitingForClient) {
-        status = 'waiting';
-    } else if (analyst.isBusy || analyst.currentTicket) {
-        status = 'busy';
-    } else if (analyst.isAvailable) {
-        status = 'available';
-    } else {
-        return; // Offline - não precisa atualizar
-    }
-    
-    // Encontrar e atualizar o card
-    const cardElement = document.querySelector(`.analyst-card-column[data-analyst-id="${analystId}"]`);
-    if (cardElement) {
-        // Substituir apenas este card
-        const parent = cardElement.parentElement;
-        if (parent) {
-            const newCardHTML = createAnalystCardHTML(analyst, status);
-            cardElement.outerHTML = newCardHTML;
-            
-            // Reanexar eventos
-            setTimeout(() => {
-                attachAnalystCardEvents();
-            }, 10);
-        }
-    }
 }
 
 // ============================================
@@ -889,9 +882,7 @@ function finishTicket(analystId) {
     updateQueueOrder();
     updateStatistics();
     updateSpecialCasesDisplay();
-    
-    // Atualizar card do analista
-    updateAnalystCard(analystId);
+    createAnalystStatusColumns(); // Recriar colunas
     
     const clientType = wasSpecialClient ? ` (cliente ${wasSpecialClient})` : '';
     showNotification(`Chamado ${ticketNumber || 'desconhecido'}${clientType} finalizado por ${analyst.name}`, 'success');
@@ -917,9 +908,7 @@ function setTicketWaiting(analystId) {
     updateQueueOrder();
     updateStatistics();
     updateSpecialCasesDisplay();
-    
-    // Atualizar card do analista
-    updateAnalystCard(analystId);
+    createAnalystStatusColumns(); // Recriar colunas
     
     const clientType = analyst.ticketSpecialType ? ` (cliente ${analyst.ticketSpecialType})` : '';
     showNotification(`${analyst.name} está aguardando retorno do cliente${clientType}. Retornou ao final da fila.`, 'info');
@@ -945,9 +934,7 @@ function resumeTicket(analystId) {
     updateQueueOrder();
     updateStatistics();
     updateSpecialCasesDisplay();
-    
-    // Atualizar card do analista
-    updateAnalystCard(analystId);
+    createAnalystStatusColumns(); // Recriar colunas
     
     const clientType = analyst.ticketSpecialType ? ` (cliente ${analyst.ticketSpecialType})` : '';
     showNotification(`${analyst.name} retomou o atendimento${clientType}`, 'success');
@@ -1314,11 +1301,6 @@ function updateAnalystAvailability() {
     const currentTime = currentHour + currentMinutes / 100;
     
     let needsRefresh = false;
-    const previousStates = window.analysts.map(a => ({
-        id: a.id,
-        isAvailable: a.isAvailable,
-        isBusy: a.isBusy
-    }));
     
     window.analysts.forEach(analyst => {
         const startTime = analyst.startTime;
@@ -1754,5 +1736,5 @@ window.appController = {
     loadStateFromLocalStorage
 };
 
-console.log('✅ app.js v3.3.1 carregado com sucesso');
-console.log('📋 Sistema otimizado para evitar perda de foco nos inputs');
+console.log('✅ app.js v3.3.2 carregado com sucesso');
+console.log('📋 Sistema corrigido: analistas agora aparecem na coluna "Em Atendimento"');
