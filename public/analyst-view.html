@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualização Analistas - Payhub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(to right, #2c3e50, #34495e);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .analyst-mode-indicator {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 10px 20px;
+            text-align: center;
+            font-weight: 600;
+            border-bottom: 2px solid #bbdefb;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            padding: 25px;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .card-title i {
+            color: #3498db;
+        }
+
+        /* Fila de atendimento */
+        .queue-item {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3498db;
+            transition: transform 0.2s;
+        }
+
+        .queue-item.current {
+            border-left-color: #2ecc71;
+            background: #e8f6ef;
+        }
+
+        .queue-item.next {
+            border-left-color: #f39c12;
+            background: #fef9e7;
+        }
+
+        .queue-item.waiting {
+            border-left-color: #e74c3c;
+            background: #fdedec;
+        }
+
+        .analyst-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .analyst-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .status-dot.available {
+            background: #2ecc71;
+        }
+
+        .status-dot.busy {
+            background: #e74c3c;
+        }
+
+        .status-dot.waiting {
+            background: #f39c12;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-dot.offline {
+            background: #95a5a6;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .status-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .ticket-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .ticket-number {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .client-name {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .time-info {
+            color: #95a5a6;
+            font-size: 13px;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Estatísticas */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        /* Clientes especiais */
+        .special-client-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .special-client-item {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .special-client-item.active {
+            border-color: #2ecc71;
+            background: #e8f6ef;
+        }
+
+        .special-client-item.busy {
+            border-color: #e74c3c;
+            background: #fdedec;
+        }
+
+        .client-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .client-name {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+
+        .assigned-analyst {
+            background: #3498db;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .current-ticket {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        /* Rodapé */
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        .footer p {
+            margin: 5px 0;
+        }
+
+        .clock-display {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 600;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .refresh-info {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 13px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <i class="fas fa-user-tie"></i>
+                Visualização para Analistas - Payhub
+            </h1>
+            <p>Monitoramento da fila de chamados em tempo real</p>
+        </div>
+
+        <div class="analyst-mode-indicator">
+            <i class="fas fa-eye"></i>
+            Modo Visualização - Apenas para consulta
+        </div>
+
+        <div class="clock-display" id="currentTime">
+            Carregando hora...
+        </div>
+
+        <div class="main-grid">
+            <!-- Fila atual -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-list-ol"></i>
+                    Fila de Atendimento
+                </div>
+                
+                <div id="queueDisplay">
+                    <div class="loading">Carregando fila...</div>
+                </div>
+            </div>
+
+            <!-- Clientes especiais -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-star"></i>
+                    Clientes Especiais
+                </div>
+                
+                <div class="special-client-list" id="specialClientsDisplay">
+                    <div class="loading">Carregando...</div>
+                </div>
+            </div>
+
+            <!-- Em atendimento -->
+            <div class="card" style="grid-column: span 2;">
+                <div class="card-title">
+                    <i class="fas fa-headset"></i>
+                    Atendimentos em Andamento
+                </div>
+                
+                <div class="stats-grid" id="activeTicketsDisplay">
+                    <div class="loading">Carregando atendimentos...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Portal de Fila de Chamados - Equipe Payhub</strong> | Versão Analista</p>
+            <p>Atualização automática a cada 30 segundos</p>
+            <p id="lastUpdate">Última atualização: --:--:--</p>
+        </div>
+    </div>
+
+    <script>
+        // Dados compartilhados
+        let analysts = [];
+        let queueOrder = [];
+        let currentAnalystIndex = 0;
+        let lastUpdate = new Date().toLocaleTimeString('pt-BR');
+
+        // Carregar dados
+        async function loadData() {
+            try {
+                // Tentar carregar do localStorage
+                const savedState = localStorage.getItem('queuePortalState');
+                if (savedState) {
+                    const parsedState = JSON.parse(savedState);
+                    
+                    analysts = parsedState.analysts || [];
+                    currentAnalystIndex = parsedState.currentAnalystIndex || 0;
+                    
+                    // Reconstruir fila
+                    if (analysts.length > 0) {
+                        updateQueueDisplay();
+                        updateSpecialClients();
+                        updateActiveTickets();
+                        updateClock();
+                        lastUpdate = new Date().toLocaleTimeString('pt-BR');
+                        document.getElementById('lastUpdate').textContent = `Última atualização: ${lastUpdate}`;
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('pt-BR', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const dateString = now.toLocaleDateString('pt-BR', { 
+                weekday: 'long',
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            document.getElementById('currentTime').innerHTML = `
+                <div style="font-size: 16px; opacity: 0.9;">${dateString}</div>
+                <div style="font-size: 32px; margin-top: 5px;">${timeString}</div>
+            `;
+        }
+
+        function updateQueueDisplay() {
+            const queueDisplay = document.getElementById('queueDisplay');
+            if (!queueDisplay || analysts.length === 0) return;
+
+            // Filtrar analistas N1 que estão na fila
+            const queueAnalysts = analysts.filter(a => a.inQueue && a.level === "N1");
+            
+            if (queueAnalysts.length === 0) {
+                queueDisplay.innerHTML = '<div class="queue-item">Nenhum analista na fila</div>';
+                return;
+            }
+
+            let html = '';
+            
+            // Analista atual
+            if (currentAnalystIndex < queueAnalysts.length) {
+                const current = queueAnalysts[currentAnalystIndex];
+                html += createAnalystQueueItem(current, 'current', 'ANALISTA ATUAL');
+            }
+
+            // Próximos (máximo 3)
+            for (let i = 1; i <= 3; i++) {
+                const nextIndex = (currentAnalystIndex + i) % queueAnalysts.length;
+                if (nextIndex < queueAnalysts.length) {
+                    const next = queueAnalysts[nextIndex];
+                    const label = i === 1 ? 'PRÓXIMO NA FILA' : `POSIÇÃO ${i + 1}`;
+                    html += createAnalystQueueItem(next, i === 1 ? 'next' : '', label);
+                }
+            }
+
+            // Outros analistas (em atendimento, aguardando, etc.)
+            const otherAnalysts = analysts.filter(a => 
+                a.level === "N1" && 
+                (a.isBusy || a.currentTicket || !a.inQueue)
+            );
+
+            if (otherAnalysts.length > 0) {
+                html += '<div style="margin-top: 20px; font-weight: 600; color: #7f8c8d; padding: 10px 0; border-top: 2px solid #e9ecef;">OUTROS ANALISTAS</div>';
+                
+                otherAnalysts.forEach(analyst => {
+                    html += createAnalystQueueItem(analyst, 
+                        analyst.ticketStatus === 'aguardando-cliente' ? 'waiting' : '',
+                        analyst.ticketStatus === 'aguardando-cliente' ? 'AGUARDANDO CLIENTE' : 
+                        analyst.isBusy ? 'EM ATENDIMENTO' : 'FORA DA FILA'
+                    );
+                });
+            }
+
+            queueDisplay.innerHTML = html;
+        }
+
+        function createAnalystQueueItem(analyst, statusClass, statusText) {
+            let statusDotClass = 'available';
+            if (analyst.ticketStatus === 'aguardando-cliente') {
+                statusDotClass = 'waiting';
+            } else if (analyst.isBusy || analyst.currentTicket) {
+                statusDotClass = 'busy';
+            } else if (!analyst.isAvailable) {
+                statusDotClass = 'offline';
+            }
+
+            let ticketInfo = '';
+            if (analyst.currentTicket) {
+                ticketInfo = `
+                    <div class="ticket-info">
+                        <div><strong>Chamado:</strong> ${analyst.currentTicket}</div>
+                        <div class="time-info">
+                            <i class="far fa-clock"></i>
+                            ${analyst.lastActivity ? formatTimeSince(analyst.lastActivity) : 'Recente'}
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="queue-item ${statusClass}">
+                    <div class="analyst-name">${analyst.name} <span style="font-size: 12px; background: #3498db; color: white; padding: 2px 8px; border-radius: 10px;">${analyst.level}</span></div>
+                    <div class="analyst-status">
+                        <span class="status-dot ${statusDotClass}"></span>
+                        <span class="status-text">${statusText}</span>
+                    </div>
+                    ${ticketInfo}
+                    <div style="margin-top: 10px; font-size: 12px; color: #95a5a6;">
+                        <i class="far fa-clock"></i> ${analyst.startTime}h - ${analyst.endTime}h
+                        <span style="margin-left: 15px;">
+                            <i class="fas fa-tasks"></i> ${analyst.ticketsHandled} chamados hoje
+                        </span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateSpecialClients() {
+            const specialClients = [
+                { client: "TIM", analyst: "Eric" },
+                { client: "Benoit", analyst: "André" },
+                { client: "DPSP", analyst: "Felipe" }
+            ];
+
+            const display = document.getElementById('specialClientsDisplay');
+            let html = '';
+
+            specialClients.forEach(special => {
+                const analyst = analysts.find(a => a.name === special.analyst);
+                const isBusy = analyst ? (analyst.currentTicket === special.client) : false;
+                const isAvailable = analyst ? analyst.isAvailable : false;
+
+                html += `
+                    <div class="special-client-item ${isBusy ? 'busy' : isAvailable ? 'active' : ''}">
+                        <div class="client-header">
+                            <div class="client-name">Cliente ${special.client}</div>
+                            <div class="assigned-analyst">${special.analyst}</div>
+                        </div>
+                        <div class="analyst-status" style="margin-top: 10px;">
+                            <span class="status-dot ${isBusy ? 'busy' : isAvailable ? 'available' : 'offline'}"></span>
+                            <span class="status-text">
+                                ${isBusy ? 'EM ATENDIMENTO' : isAvailable ? 'DISPONÍVEL' : 'INDISPONÍVEL'}
+                            </span>
+                        </div>
+                        ${isBusy && analyst.currentTicket ? `
+                            <div class="current-ticket">
+                                <i class="fas fa-ticket-alt"></i> Atendendo: ${analyst.currentTicket}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            display.innerHTML = html || '<div>Nenhum cliente especial configurado</div>';
+        }
+
+        function updateActiveTickets() {
+            const display = document.getElementById('activeTicketsDisplay');
+            
+            // Filtrar analistas em atendimento
+            const activeAnalysts = analysts.filter(a => 
+                a.currentTicket && (a.isBusy || a.ticketStatus === 'aguardando-cliente')
+            );
+
+            if (activeAnalysts.length === 0) {
+                display.innerHTML = '<div class="stat-card">Nenhum atendimento em andamento</div>';
+                return;
+            }
+
+            let html = '';
+            
+            activeAnalysts.forEach(analyst => {
+                const status = analyst.ticketStatus === 'aguardando-cliente' ? 
+                    'Aguardando Cliente' : 'Em Atendimento';
+                
+                html += `
+                    <div class="stat-card">
+                        <div style="font-size: 14px; color: #7f8c8d; margin-bottom: 5px;">${analyst.name}</div>
+                        <div class="stat-value" style="font-size: 24px;">${analyst.currentTicket}</div>
+                        <div style="font-size: 12px; color: ${analyst.ticketStatus === 'aguardando-cliente' ? '#f39c12' : '#2ecc71'};">
+                            ${status}
+                        </div>
+                        ${analyst.lastActivity ? `
+                            <div style="font-size: 11px; color: #95a5a6; margin-top: 5px;">
+                                <i class="far fa-clock"></i> ${formatTimeSince(analyst.lastActivity)}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            display.innerHTML = html;
+        }
+
+        function formatTimeSince(date) {
+            if (!date) return 'Recente';
+            
+            const now = new Date();
+            const diffMs = now - new Date(date);
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins < 1) return 'Agora mesmo';
+            if (diffMins < 60) return `Há ${diffMins} min`;
+            
+            const diffHours = Math.floor(diffMins / 60);
+            return `Há ${diffHours} h`;
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+            updateClock();
+            
+            // Atualizar relógio a cada segundo
+            setInterval(updateClock, 1000);
+            
+            // Atualizar dados a cada 30 segundos
+            setInterval(loadData, 30000);
+            
+            // Adicionar info de atualização
+            document.getElementById('lastUpdate').textContent = `Última atualização: ${lastUpdate}`;
+        });
+
+        // Permitir atualização manual com F5
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F5') {
+                e.preventDefault();
+                loadData();
+            }
+        });
+    </script>
+</body>
+</html>
