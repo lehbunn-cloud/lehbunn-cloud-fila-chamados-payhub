@@ -127,83 +127,84 @@
         </div>
         
         <!-- Painel de controles -->
-        <div class="controls-grid">
-            <div class="card">
-                <div class="card-title">
-                    <i class="fas fa-plus-circle"></i>
-                    Novo Chamado
-                </div>
-                <div class="control-group">
-                    <input type="text" id="newTicketNumber" class="input-field" placeholder="Número do chamado (ou deixe em branco para gerar automático)">
-                    <select id="ticketType" class="input-field">
-                        <option value="normal">Chamado Normal</option>
-                        <option value="TIM">Cliente TIM (Eric)</option>
-                        <option value="DPSP">Cliente DPSP (Tamiris)</option>
-                        <option value="Benoit">Cliente Benoit (André)</option>
-                    </select>
-                    <button class="btn btn-success" id="addTicketBtn" disabled>
-                        <i class="fas fa-plus"></i>
-                        Adicionar Chamado
-                    </button>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-title">
-                    <i class="fas fa-cogs"></i>
-                    Controles da Fila
-                </div>
-                <div class="control-group">
-                    <button class="btn" id="nextAnalystBtn" disabled>
-                        <i class="fas fa-forward"></i>
-                        Próximo Analista
-                    </button>
-                    <button class="btn btn-warning" id="resetQueueBtn" disabled>
-                        <i class="fas fa-redo-alt"></i>
-                        Reiniciar Fila do Dia
-                    </button>
-                    <button class="btn btn-danger" id="freeAllBtn" disabled>
-                        <i class="fas fa-user-check"></i>
-                        Liberar Todos
-                    </button>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-title">
-                    <i class="fas fa-clock"></i>
-                    Simulação de Horário
-                </div>
-                <div class="control-group">
-                    <button class="btn" id="simulateTimeBtn" disabled>
-                        <i class="fas fa-magic"></i>
-                        Simular Horário
-                    </button>
-                    <button class="btn btn-warning" id="realTimeBtn" style="display: none;" disabled>
-                        <i class="fas fa-clock"></i>
-                        Voltar ao Horário Real
-                    </button>
-                    <div class="last-reset" id="lastResetInfo"></div>
-                </div>
-            </div>
-            
-            <!-- Novo card para relatórios CSV -->
-            <div class="card">
-                <div class="card-title">
-                    <i class="fas fa-file-csv"></i>
-                    Relatórios CSV
-                </div>
-                <div class="control-group">
-                    <button class="btn btn-cyan" id="generateReportBtn" disabled>
-                        <i class="fas fa-download"></i>
-                        Gerar Relatório CSV
-                    </button>
-                    <div class="last-reset" id="reportInfo" style="font-size: 12px;">
-                        Conecte-se para gerar relatórios
-                    </div>
-                </div>
+        <!-- Painel de controles - NOVO -->
+<div class="controls-grid">
+    <div class="card">
+        <div class="card-title">
+            <i class="fas fa-plus-circle"></i>
+            Novo Chamado
+        </div>
+        <div class="control-group">
+            <input type="text" id="newTicketNumber" class="input-field" placeholder="Número do chamado (ou deixe em branco para gerar automático)">
+            <select id="ticketType" class="input-field">
+                <option value="normal">Chamado Normal</option>
+                <option value="TIM">Cliente TIM (Eric)</option>
+                <option value="DPSP">Cliente DPSP (Tamiris)</option>
+                <option value="Benoit">Cliente Benoit (André)</option>
+            </select>
+            <button class="btn btn-success" id="addTicketBtn">
+                <i class="fas fa-plus"></i>
+                Adicionar Chamado
+            </button>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-title">
+            <i class="fas fa-cogs"></i>
+            Controles da Fila
+        </div>
+        <div class="control-group">
+            <button class="btn" id="nextAnalystBtn">
+                <i class="fas fa-forward"></i>
+                Próximo Analista
+            </button>
+            <button class="btn btn-warning" id="resetQueueBtn">
+                <i class="fas fa-redo-alt"></i>
+                Reiniciar Fila do Dia
+            </button>
+            <button class="btn btn-danger" id="freeAllBtn">
+                <i class="fas fa-user-check"></i>
+                Liberar Todos
+            </button>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-title">
+            <i class="fas fa-clock"></i>
+            Simulação de Horário
+        </div>
+        <div class="control-group">
+            <button class="btn" id="simulateTimeBtn">
+                <i class="fas fa-magic"></i>
+                Simular Horário
+            </button>
+            <button class="btn btn-warning" id="realTimeBtn" style="display: none;">
+                <i class="fas fa-clock"></i>
+                Voltar ao Horário Real
+            </button>
+            <div class="last-reset" id="lastResetInfo"></div>
+        </div>
+    </div>
+    
+    <!-- Novo card para relatórios CSV -->
+    <div class="card">
+        <div class="card-title">
+            <i class="fas fa-file-csv"></i>
+            Relatórios CSV
+        </div>
+        <div class="control-group">
+            <button class="btn btn-cyan" id="generateReportBtn">
+                <i class="fas fa-download"></i>
+                Gerar Relatório CSV
+            </button>
+            <div class="last-reset" id="reportInfo" style="font-size: 12px;">
+                Conecte-se para gerar relatórios
             </div>
         </div>
+    </div>
+</div>
         
         <!-- Rodapé -->
         <div class="footer">
@@ -408,3 +409,4 @@
     <script src="app.js"></script>
 </body>
 </html>
+
