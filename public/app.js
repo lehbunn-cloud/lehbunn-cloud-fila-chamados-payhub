@@ -220,6 +220,15 @@ function initializeApp() {
         
         console.log('✅ Aplicação inicializada com sucesso');
         
+        // Focar no campo de número do chamado
+        setTimeout(() => {
+            const ticketInput = document.getElementById('newTicketNumber');
+            if (ticketInput) {
+                ticketInput.focus();
+                ticketInput.select();
+            }
+        }, 500);
+        
         // Mostrar notificação de boas-vindas
         setTimeout(() => {
             if (typeof showNotification === 'function') {
@@ -730,9 +739,33 @@ function attachAnalystCardEvents() {
             
             if (ticketNumber) {
                 assignTicketToAnalyst(analystId, ticketNumber, 'normal', 'atendendo');
-                if (input) input.value = '';
+                if (input) {
+                    input.value = '';
+                    input.focus(); // Manter foco no mesmo campo
+                }
             } else {
                 showNotification('Digite um número de chamado', 'warning');
+                if (input) input.focus();
+            }
+        });
+    });
+    
+    // Permitir Enter nos campos de atribuição direta
+    document.querySelectorAll('.assign-ticket-input').forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const analystId = parseInt(this.getAttribute('data-analyst-id'));
+                const ticketNumber = this.value.trim();
+                
+                if (ticketNumber) {
+                    assignTicketToAnalyst(analystId, ticketNumber, 'normal', 'atendendo');
+                    this.value = '';
+                    this.focus(); // Manter foco no mesmo campo
+                } else {
+                    showNotification('Digite um número de chamado', 'warning');
+                    this.focus();
+                }
             }
         });
     });
@@ -813,15 +846,27 @@ function handleNewTicket() {
         }
         
         // Processar chamado
+        let success = false;
         if (ticketType !== 'normal') {
-            handleSpecialTicket(ticketNumber, ticketType);
+            success = handleSpecialTicket(ticketNumber, ticketType);
         } else {
-            handleNormalTicket(ticketNumber);
+            success = handleNormalTicket(ticketNumber);
         }
         
-        // Limpar campo e dar foco novamente
-        ticketNumberInput.value = '';
-        ticketNumberInput.focus();
+        // Se foi processado com sucesso, limpar campo e manter foco
+        if (success) {
+            ticketNumberInput.value = '';
+            
+            // Pequeno delay para garantir que o DOM foi atualizado
+            setTimeout(() => {
+                ticketNumberInput.focus();
+                ticketNumberInput.select();
+            }, 10);
+        } else {
+            // Se houve erro, manter o valor para correção
+            ticketNumberInput.focus();
+            ticketNumberInput.select();
+        }
         
         // Salvar estado
         saveStateToLocalStorage();
@@ -829,6 +874,13 @@ function handleNewTicket() {
     } catch (error) {
         console.error('❌ Erro em handleNewTicket:', error);
         showNotification('Erro ao processar chamado: ' + error.message, 'error');
+        
+        // Em caso de erro, manter foco no campo
+        const ticketNumberInput = document.getElementById('newTicketNumber');
+        if (ticketNumberInput) {
+            ticketNumberInput.focus();
+            ticketNumberInput.select();
+        }
     }
 }
 
@@ -844,7 +896,7 @@ function handleNormalTicket(ticketNumber) {
     
     if (appState.queueOrder.length === 0) {
         showNotification('Nenhum analista disponível na fila!', 'warning');
-        return;
+        return false;
     }
     
     const currentAnalyst = appState.queueOrder[appState.currentAnalystIndex];
@@ -858,10 +910,13 @@ function handleNormalTicket(ticketNumber) {
         const newCurrentAnalyst = appState.queueOrder[appState.currentAnalystIndex];
         if (newCurrentAnalyst && newCurrentAnalyst.isAvailable && !newCurrentAnalyst.isBusy) {
             assignTicketToAnalyst(newCurrentAnalyst.id, ticketNumber, 'normal', 'atendendo');
+            appState.ticketsToday++;
+            showNotification(`Chamado ${ticketNumber} atribuído a ${newCurrentAnalyst.name}`, 'success');
+            return true;
         } else {
             showNotification('Nenhum analista disponível!', 'error');
+            return false;
         }
-        return;
     }
     
     assignTicketToAnalyst(currentAnalyst.id, ticketNumber, 'normal', 'atendendo');
@@ -869,6 +924,7 @@ function handleNormalTicket(ticketNumber) {
     appState.ticketsToday++;
     
     showNotification(`Chamado ${ticketNumber} atribuído a ${currentAnalyst.name}`, 'success');
+    return true;
 }
 
 function handleSpecialTicket(ticketNumber, ticketType) {
@@ -882,19 +938,19 @@ function handleSpecialTicket(ticketNumber, ticketType) {
     
     if (!specialClient) {
         showNotification(`Cliente especial não encontrado!`, 'error');
-        return;
+        return false;
     }
     
     const analyst = window.analysts.find(a => a.name === specialClient.analyst);
     
     if (!analyst) {
         showNotification(`Analista ${specialClient.analyst} não encontrado!`, 'error');
-        return;
+        return false;
     }
     
     if (!analyst.isAvailable || (analyst.isBusy && analyst.ticketStatus !== 'aguardando-cliente')) {
         showNotification(`${analyst.name} não está disponível!`, 'warning');
-        return;
+        return false;
     }
     
     assignTicketToAnalyst(analyst.id, ticketNumber, ticketType, 'atendendo');
@@ -902,6 +958,7 @@ function handleSpecialTicket(ticketNumber, ticketType) {
     appState.specialTicketsToday++;
     
     showNotification(`Chamado especial ${ticketNumber} atribuído a ${analyst.name}`, 'success');
+    return true;
 }
 
 function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus = 'atendendo') {
