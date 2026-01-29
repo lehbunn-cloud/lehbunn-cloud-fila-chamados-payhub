@@ -1441,12 +1441,12 @@ function enableAppControls() {
 
 function showNotification(message, type = 'success') {
     // Verificar se a função já existe (pode estar no Firebase integration)
-    if (typeof window.showNotification === 'function') {
-        window.showNotification(message, type);
+    if (typeof window.firebaseAppIntegration?.showNotification === 'function') {
+        window.firebaseAppIntegration.showNotification(message, type);
         return;
     }
     
-    // Implementação local
+    // Implementação local...
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.innerHTML = `
@@ -1654,3 +1654,4 @@ window.appController = {
 };
 
 console.log('✅ app.js carregado com sucesso');
+
