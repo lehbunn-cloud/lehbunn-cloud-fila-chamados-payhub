@@ -2,9 +2,9 @@
 // PORTAL DE FILA DE CHAMADOS - PAYHUB
 // ============================================
 // app.js - Lógica principal da aplicação
-// Versão: 2.1.0
+// Versão: 3.0.0
 // Data: 2024
-// CORREÇÃO: Problema de foco nos inputs resolvido
+// ATUALIZAÇÃO: André e Felipe agora N1, Felipe atende DPSP, Fila rigorosa
 
 // ============================================
 // CONFIGURAÇÃO GLOBAL
@@ -52,7 +52,7 @@ window.analysts = [
         isBusy: false,
         currentTicket: null,
         ticketStatus: null,
-        specialClient: "DPSP",
+        specialClient: null,  // REMOVIDO: Não atende mais DPSP
         inQueue: true,
         ticketsHandled: 0,
         lastActivity: null
@@ -120,40 +120,41 @@ window.analysts = [
     { 
         id: 8, 
         name: "André", 
-        level: "N2", 
+        level: "N1",  // MODIFICADO: Era N2, agora N1
         startTime: 8, 
         endTime: 18, 
         isAvailable: false, 
         isBusy: false,
         currentTicket: null,
         ticketStatus: null,
-        specialClient: "Benoit",
-        inQueue: false,
+        specialClient: "Benoit",  // Mantém cliente especial
+        inQueue: true,  // MODIFICADO: Agora entra na fila
         ticketsHandled: 0,
         lastActivity: null
     },
     { 
         id: 9, 
+
         name: "Felipe", 
-        level: "N2", 
+        level: "N1",  // MODIFICADO: Era N2, agora N1
         startTime: 8, 
         endTime: 18, 
         isAvailable: false, 
         isBusy: false,
         currentTicket: null,
         ticketStatus: null,
-        specialClient: null,
-        inQueue: false,
+        specialClient: "DPSP",  // MODIFICADO: Agora atende DPSP
+        inQueue: true,  // MODIFICADO: Agora entra na fila
         ticketsHandled: 0,
         lastActivity: null
     }
 ];
 
-// Clientes especiais
+// Clientes especiais - ATUALIZADO
 window.specialClients = [
-    { client: "Benoit", analyst: "André", level: "N2" },
+    { client: "Benoit", analyst: "André", level: "N1" },
     { client: "TIM", analyst: "Eric", level: "N1" },
-    { client: "DPSP", analyst: "Tamiris", level: "N1" }
+    { client: "DPSP", analyst: "Felipe", level: "N1" }  // MODIFICADO: Era Tamiris, agora Felipe
 ];
 
 // Estado da aplicação
@@ -171,7 +172,9 @@ let appState = {
     isInitialized: false,
     autoRefreshInterval: null,
     // NOVO: Controlar qual input tem foco
-    focusedInputId: null
+    focusedInputId: null,
+    // NOVO: Registrar quem atribuiu chamados fora da fila
+    manualAssignments: []
 };
 
 // Cache para melhor performance
@@ -186,7 +189,7 @@ let cache = {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Inicializando Portal de Fila Payhub...');
+    console.log('🚀 Inicializando Portal de Fila Payhub v3.0.0...');
     
     // Inicializar componentes
     initializeApp();
@@ -221,7 +224,7 @@ function initializeApp() {
         // Marcar como inicializado
         appState.isInitialized = true;
         
-        console.log('✅ Aplicação inicializada com sucesso');
+        console.log('✅ Aplicação v3.0.0 inicializada com sucesso');
         
         // Focar no campo de número do chamado
         setTimeout(() => {
@@ -235,7 +238,7 @@ function initializeApp() {
         // Mostrar notificação de boas-vindas
         setTimeout(() => {
             if (typeof showNotification === 'function') {
-                showNotification('Sistema de fila carregado', 'success');
+                showNotification('Sistema de fila v3.0.0 carregado', 'success');
             }
         }, 1000);
         
@@ -440,7 +443,7 @@ function updateAnalystAvailability() {
             analyst.isAvailable = false;
         }
         
-        if (analyst.name === "Tamiris" && analyst.currentTicket === "DPSP") {
+        if (analyst.name === "Felipe" && analyst.currentTicket === "DPSP") {  // MODIFICADO: Era Tamiris, agora Felipe
             analyst.isBusy = true;
             analyst.isAvailable = false;
         }
@@ -472,12 +475,12 @@ function updateAnalystAvailability() {
 // ============================================
 
 function updateQueueOrder() {
-    // Filtrar apenas analistas N1 disponíveis (não ocupados)
+    // FILTRAR ANALISTAS N1 DISPONÍVEIS (NÃO OCUPADOS) QUE ESTÃO NA FILA
     const availableAnalysts = window.analysts.filter(a => 
-        a.level === "N1" && 
+        a.level === "N1" &&  // APENAS N1 (inclui André e Felipe agora)
         a.isAvailable && 
         !a.isBusy && // Não está ocupado com atendimento
-        a.inQueue
+        a.inQueue    // Está configurado para participar da fila
     );
     
     if (availableAnalysts.length === 0) {
@@ -690,9 +693,9 @@ function createAnalystCardHTML(analyst, status) {
                 <input type="text" class="input-field assign-ticket-input" 
                        placeholder="Nº Chamado" 
                        data-analyst-id="${analyst.id}"
-                       title="Digite o número do chamado"
+                       title="Digite o número do chamado (apenas para casos especiais)"
                        style="font-size: 12px; padding: 6px 10px;">
-                <button class="btn btn-small assign-ticket-btn" data-analyst-id="${analyst.id}" title="Atribuir chamado">
+                <button class="btn btn-small assign-ticket-btn" data-analyst-id="${analyst.id}" title="Atribuir chamado (apenas para clientes especiais)">
                     <i class="fas fa-paperclip"></i> Atribuir
                 </button>
             </div>
@@ -751,7 +754,7 @@ function getStatusDotClass(analyst) {
 function getClientNameFromTicket(ticket) {
     const specialClient = window.specialClients.find(c => 
         c.analyst === "Eric" && ticket === "TIM" ||
-        c.analyst === "Tamiris" && ticket === "DPSP" ||
+        c.analyst === "Felipe" && ticket === "DPSP" ||  // MODIFICADO: Era Tamiris, agora Felipe
         c.analyst === "André" && ticket === "Benoit"
     );
     return specialClient ? specialClient.client : null;
@@ -772,7 +775,7 @@ function formatTimeSince(date) {
 }
 
 function attachAnalystCardEvents() {
-    // Botões de atribuir ticket
+    // Botões de atribuir ticket - AGORA RESTRITO A CASOS ESPECIAIS
     document.querySelectorAll('.assign-ticket-btn').forEach(button => {
         button.addEventListener('click', function() {
             const analystId = parseInt(this.getAttribute('data-analyst-id'));
@@ -780,10 +783,23 @@ function attachAnalystCardEvents() {
             const ticketNumber = input?.value.trim();
             
             if (ticketNumber) {
-                assignTicketToAnalyst(analystId, ticketNumber, 'normal', 'atendendo');
-                if (input) {
-                    input.value = '';
-                    input.focus(); // Manter foco no mesmo campo
+                // Verificar se é um cliente especial para este analista
+                const analyst = window.analysts.find(a => a.id === analystId);
+                if (analyst && analyst.specialClient) {
+                    // Verificar se o ticket corresponde ao cliente especial
+                    if (ticketNumber.includes(analyst.specialClient)) {
+                        assignTicketToAnalyst(analystId, ticketNumber, analyst.specialClient, 'atendendo');
+                        if (input) {
+                            input.value = '';
+                            input.focus();
+                        }
+                    } else {
+                        showNotification(`Apenas chamados do cliente ${analyst.specialClient} podem ser atribuídos manualmente a ${analyst.name}`, 'warning');
+                        if (input) input.focus();
+                    }
+                } else {
+                    showNotification('Este analista não tem cliente especial designado. Use a fila normal.', 'warning');
+                    if (input) input.focus();
                 }
             } else {
                 showNotification('Digite um número de chamado', 'warning');
@@ -801,9 +817,22 @@ function attachAnalystCardEvents() {
                 const ticketNumber = this.value.trim();
                 
                 if (ticketNumber) {
-                    assignTicketToAnalyst(analystId, ticketNumber, 'normal', 'atendendo');
-                    this.value = '';
-                    this.focus(); // Manter foco no mesmo campo
+                    // Verificar se é um cliente especial para este analista
+                    const analyst = window.analysts.find(a => a.id === analystId);
+                    if (analyst && analyst.specialClient) {
+                        // Verificar se o ticket corresponde ao cliente especial
+                        if (ticketNumber.includes(analyst.specialClient)) {
+                            assignTicketToAnalyst(analystId, ticketNumber, analyst.specialClient, 'atendendo');
+                            this.value = '';
+                            this.focus();
+                        } else {
+                            showNotification(`Apenas chamados do cliente ${analyst.specialClient} podem ser atribuídos manualmente a ${analyst.name}`, 'warning');
+                            this.focus();
+                        }
+                    } else {
+                        showNotification('Este analista não tem cliente especial designado. Use a fila normal.', 'warning');
+                        this.focus();
+                    }
                 } else {
                     showNotification('Digite um número de chamado', 'warning');
                     this.focus();
@@ -931,26 +960,44 @@ function handleNormalTicket(ticketNumber) {
         return false;
     }
     
+    // IMPORTANTE: Agora sempre pega o próximo da fila
     const currentAnalyst = appState.queueOrder[appState.currentAnalystIndex];
     
+    // Verificar se o analista atual está realmente disponível
     if (!currentAnalyst || !currentAnalyst.isAvailable || 
         (currentAnalyst.isBusy && currentAnalyst.ticketStatus !== 'aguardando-cliente')) {
         
-        showNotification(`${currentAnalyst?.name || 'Analista'} não está disponível. Indo para o próximo...`, 'warning');
-        nextAnalyst();
+        // Se não estiver disponível, procurar próximo disponível na fila
+        let nextAvailableIndex = -1;
+        for (let i = 0; i < appState.queueOrder.length; i++) {
+            const idx = (appState.currentAnalystIndex + i) % appState.queueOrder.length;
+            const analyst = appState.queueOrder[idx];
+            if (analyst.isAvailable && !analyst.isBusy) {
+                nextAvailableIndex = idx;
+                break;
+            }
+        }
         
-        const newCurrentAnalyst = appState.queueOrder[appState.currentAnalystIndex];
-        if (newCurrentAnalyst && newCurrentAnalyst.isAvailable && !newCurrentAnalyst.isBusy) {
-            assignTicketToAnalyst(newCurrentAnalyst.id, ticketNumber, 'normal', 'atendendo');
-            appState.ticketsToday++;
-            showNotification(`Chamado ${ticketNumber} atribuído a ${newCurrentAnalyst.name}`, 'success');
-            return true;
-        } else {
-            showNotification('Nenhum analista disponível!', 'error');
+        if (nextAvailableIndex === -1) {
+            showNotification('Nenhum analista disponível na fila!', 'error');
             return false;
         }
+        
+        // Atualizar índice para o analista disponível
+        appState.currentAnalystIndex = nextAvailableIndex;
+        const availableAnalyst = appState.queueOrder[nextAvailableIndex];
+        
+        assignTicketToAnalyst(availableAnalyst.id, ticketNumber, 'normal', 'atendendo');
+        appState.ticketsToday++;
+        
+        // Avançar para o próximo após atribuir
+        nextAnalyst();
+        
+        showNotification(`Chamado ${ticketNumber} atribuído a ${availableAnalyst.name} (próximo disponível)`, 'success');
+        return true;
     }
     
+    // Se o atual está disponível, atribuir a ele
     assignTicketToAnalyst(currentAnalyst.id, ticketNumber, 'normal', 'atendendo');
     nextAnalyst();
     appState.ticketsToday++;
@@ -959,6 +1006,7 @@ function handleNormalTicket(ticketNumber) {
     return true;
 }
 
+// MODIFICADO: Atualizar tratamento de casos especiais
 function handleSpecialTicket(ticketNumber, ticketType) {
     const specialClient = window.specialClients.find(c => 
         ticketType === 'TIM' ? c.client === 'TIM' :
@@ -979,7 +1027,7 @@ function handleSpecialTicket(ticketNumber, ticketType) {
     }
     
     if (!analyst.isAvailable || (analyst.isBusy && analyst.ticketStatus !== 'aguardando-cliente')) {
-        showNotification(`${analyst.name} não está disponível!`, 'warning');
+        showNotification(`${analyst.name} não está disponível para cliente ${specialClient.client}!`, 'warning');
         return false;
     }
     
@@ -987,7 +1035,7 @@ function handleSpecialTicket(ticketNumber, ticketType) {
     appState.ticketsToday++;
     appState.specialTicketsToday++;
     
-    showNotification(`Chamado especial ${ticketNumber} atribuído a ${analyst.name}`, 'success');
+    showNotification(`Chamado especial ${ticketNumber} (${specialClient.client}) atribuído a ${analyst.name}`, 'success');
     return true;
 }
 
@@ -1019,8 +1067,31 @@ function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus
         analyst.inQueue = false;
     }
     
-    if (analyst.name === "Tamiris" && ticketType === "DPSP") {
+    if (analyst.name === "Felipe" && ticketType === "DPSP") {  // MODIFICADO: Era Tamiris, agora Felipe
         analyst.inQueue = false;
+    }
+    
+    if (analyst.name === "André" && ticketType === "Benoit") {
+        analyst.inQueue = false;
+    }
+    
+    // Registrar atribuição manual (se não foi através da fila normal)
+    if (!appState.queueOrder.some(a => a.id === analystId) || 
+        (appState.queueOrder.length > 0 && appState.queueOrder[appState.currentAnalystIndex].id !== analystId)) {
+        
+        appState.manualAssignments.push({
+            timestamp: new Date().toISOString(),
+            analystId: analystId,
+            analystName: analyst.name,
+            ticketNumber: ticketNumber,
+            ticketType: ticketType,
+            reason: ticketType !== 'normal' ? 'cliente_especial' : 'atribuicao_manual'
+        });
+        
+        // Manter apenas últimos 100 registros
+        if (appState.manualAssignments.length > 100) {
+            appState.manualAssignments = appState.manualAssignments.slice(-100);
+        }
     }
     
     // Atualizar interface com preservação de foco
@@ -1049,7 +1120,12 @@ function setTicketWaiting(analystId) {
     analyst.lastActivity = new Date();
     
     // Retornar à fila se for analista N1
-    if (analyst.level === "N1" && analyst.inQueue) {
+    if (analyst.level === "N1" && !analyst.inQueue && analyst.specialClient) {
+        // Se era um caso especial, verificar se ainda tem o ticket do cliente especial
+        if (analyst.currentTicket !== analyst.specialClient) {
+            analyst.inQueue = true;
+        }
+    } else if (analyst.level === "N1" && analyst.inQueue) {
         updateQueueOrder();
     }
     
@@ -1071,9 +1147,10 @@ function resumeTicket(analystId) {
     analyst.isBusy = true;
     analyst.lastActivity = new Date();
     
-    // Se estiver na fila, remover temporariamente
-    if (analyst.level === "N1" && analyst.inQueue) {
-        updateQueueOrder();
+    // Se estiver na fila, remover temporariamente se for caso especial
+    if (analyst.level === "N1" && analyst.inQueue && analyst.specialClient && 
+        analyst.currentTicket === analyst.specialClient) {
+        analyst.inQueue = false;
     }
     
     updateQueueDisplayPreservingFocus();
@@ -1090,6 +1167,7 @@ function finishTicket(analystId) {
     if (!analyst) return;
     
     const ticketNumber = analyst.currentTicket;
+    const wasSpecialClient = analyst.specialClient && analyst.currentTicket === analyst.specialClient;
     
     // Salvar histórico antes de limpar
     if (ticketNumber && window.firebaseAppIntegration?.saveTicketToFirebase) {
@@ -1102,8 +1180,8 @@ function finishTicket(analystId) {
     analyst.ticketStatus = null;
     analyst.lastActivity = null;
     
-    // Reintegrar à fila se for Eric ou Tamiris (casos especiais)
-    if (analyst.name === "Eric" || analyst.name === "Tamiris") {
+    // Reintegrar à fila se for analista N1 (inclui Eric, Felipe e André agora)
+    if (analyst.level === "N1") {
         analyst.inQueue = true;
     }
     
@@ -1145,6 +1223,7 @@ function resetQueue() {
     appState.queueOrder = [];
     appState.lastReset = new Date().toLocaleDateString('pt-BR');
     appState.dailyResetDone = false;
+    appState.manualAssignments = [];
     
     window.analysts.forEach(analyst => {
         analyst.ticketsHandled = 0;
@@ -1152,6 +1231,7 @@ function resetQueue() {
         analyst.currentTicket = null;
         analyst.ticketStatus = null;
         analyst.lastActivity = null;
+        // Todos os N1 entram na fila (inclui André e Felipe)
         analyst.inQueue = analyst.level === "N1";
     });
     
@@ -1182,6 +1262,7 @@ function freeAllAnalysts() {
             analyst.currentTicket = null;
             analyst.ticketStatus = null;
             analyst.lastActivity = null;
+            // Todos os N1 retornam à fila (inclui André e Felipe)
             analyst.inQueue = analyst.level === "N1";
             freedCount++;
         }
@@ -1626,6 +1707,7 @@ function loadStateFromLocalStorage() {
             appState.currentAnalystIndex = parsedState.currentAnalystIndex || 0;
             appState.nextTicketNumber = parsedState.nextTicketNumber || 1000;
             appState.dailyResetDone = parsedState.dailyResetDone || false;
+            appState.manualAssignments = parsedState.manualAssignments || [];
             
             if (parsedState.simulatedTime) {
                 appState.simulatedTime = new Date(parsedState.simulatedTime);
@@ -1661,7 +1743,7 @@ function loadStateFromLocalStorage() {
 
 function exportBackup() {
     const backup = {
-        version: '2.1.0',
+        version: '3.0.0',
         timestamp: new Date().toISOString(),
         appState: appState,
         analysts: window.analysts,
@@ -1730,6 +1812,27 @@ function importBackup(file) {
     reader.readAsText(file);
 }
 
+// NOVAS FUNÇÕES PARA OUTRAS PÁGINAS
+function getQueueDataForView() {
+    return {
+        analysts: window.analysts,
+        queueOrder: appState.queueOrder,
+        currentAnalystIndex: appState.currentAnalystIndex,
+        ticketsToday: appState.ticketsToday,
+        specialTicketsToday: appState.specialTicketsToday,
+        waitingTicketsToday: appState.waitingTicketsToday
+    };
+}
+
+function getAdminData() {
+    return {
+        appState: appState,
+        analysts: window.analysts,
+        specialClients: window.specialClients,
+        manualAssignments: appState.manualAssignments
+    };
+}
+
 // ============================================
 // EXPORTAR FUNÇÕES PARA USO GLOBAL
 // ============================================
@@ -1771,7 +1874,12 @@ window.appController = {
     // Utilitários
     showNotification,
     saveStateToLocalStorage,
-    loadStateFromLocalStorage
+    loadStateFromLocalStorage,
+    
+    // Novas funções para outras páginas
+    getQueueDataForView,
+    getAdminData
 };
 
-console.log('✅ app.js v2.1.0 carregado com sucesso - Problema de foco corrigido');
+console.log('✅ app.js v3.0.0 carregado com sucesso');
+console.log('📋 Alterações: André e Felipe agora N1, Felipe atende DPSP, fila rigorosa');
