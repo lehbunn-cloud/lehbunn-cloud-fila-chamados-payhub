@@ -1,8 +1,16 @@
 // ============================================
-// CONFIGURAÇÃO DOS ANALISTAS
+// PORTAL DE FILA DE CHAMADOS - PAYHUB
+// ============================================
+// app.js - Lógica principal da aplicação
+// Versão: 2.0.0
+// Data: 2024
+
+// ============================================
+// CONFIGURAÇÃO GLOBAL
 // ============================================
 
-const analysts = [
+// Configuração dos analistas
+window.analysts = [
     { 
         id: 1, 
         name: "Eric", 
@@ -15,7 +23,8 @@ const analysts = [
         ticketStatus: null,
         specialClient: "TIM",
         inQueue: true,
-        ticketsHandled: 0
+        ticketsHandled: 0,
+        lastActivity: null
     },
     { 
         id: 2, 
@@ -29,7 +38,8 @@ const analysts = [
         ticketStatus: null,
         specialClient: null,
         inQueue: true,
-        ticketsHandled: 0
+        ticketsHandled: 0,
+        lastActivity: null
     },
     { 
         id: 3, 
@@ -43,7 +53,8 @@ const analysts = [
         ticketStatus: null,
         specialClient: "DPSP",
         inQueue: true,
-        ticketsHandled: 0
+        ticketsHandled: 0,
+        lastActivity: null
     },
     { 
         id: 4, 
@@ -57,7 +68,8 @@ const analysts = [
         ticketStatus: null,
         specialClient: null,
         inQueue: true,
-        ticketsHandled: 0
+        ticketsHandled: 0,
+        lastActivity: null
     },
     { 
         id: 5, 
@@ -71,7 +83,8 @@ const analysts = [
         ticketStatus: null,
         specialClient: null,
         inQueue: true,
-        ticketsHandled: 0
+        ticketsHandled: 0,
+        lastActivity: null
     },
     { 
         id: 6, 
@@ -85,7 +98,8 @@ const analysts = [
         ticketStatus: null,
         specialClient: null,
         inQueue: true,
-        ticketsHandled: 0
+        ticketsHandled: 0,
+        lastActivity: null
     },
     { 
         id: 7, 
@@ -99,7 +113,8 @@ const analysts = [
         ticketStatus: null,
         specialClient: null,
         inQueue: true,
-        ticketsHandled: 0
+        ticketsHandled: 0,
+        lastActivity: null
     },
     { 
         id: 8, 
@@ -113,7 +128,8 @@ const analysts = [
         ticketStatus: null,
         specialClient: "Benoit",
         inQueue: false,
-        ticketsHandled: 0
+        ticketsHandled: 0,
+        lastActivity: null
     },
     { 
         id: 9, 
@@ -127,19 +143,20 @@ const analysts = [
         ticketStatus: null,
         specialClient: null,
         inQueue: false,
-        ticketsHandled: 0
+        ticketsHandled: 0,
+        lastActivity: null
     }
 ];
 
 // Clientes especiais
-const specialClients = [
+window.specialClients = [
     { client: "Benoit", analyst: "André", level: "N2" },
     { client: "TIM", analyst: "Eric", level: "N1" },
     { client: "DPSP", analyst: "Tamiris", level: "N1" }
 ];
 
 // Estado da aplicação
-let state = {
+let appState = {
     currentAnalystIndex: 0,
     ticketsToday: 0,
     specialTicketsToday: 0,
@@ -149,7 +166,16 @@ let state = {
     lastUpdate: new Date().toLocaleTimeString('pt-BR'),
     simulatedTime: null,
     nextTicketNumber: 1000,
-    dailyResetDone: false
+    dailyResetDone: false,
+    isInitialized: false,
+    autoRefreshInterval: null
+};
+
+// Cache para melhor performance
+let cache = {
+    lastUpdate: 0,
+    queueHTML: '',
+    analystsData: {}
 };
 
 // ============================================
@@ -157,108 +183,220 @@ let state = {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Inicializando Portal de Fila Payhub...');
+    
+    // Inicializar componentes
     initializeApp();
+    
+    // Configurar atualização automática
+    setupAutoRefresh();
+    
+    // Configurar listeners
     setupEventListeners();
     
-    // Atualizar a cada minuto
-    setInterval(updateApp, 60000);
+    // Verificar estado salvo
+    checkSavedState();
 });
 
 function initializeApp() {
-    updateCurrentTime();
-    updateAnalystAvailability();
-    updateQueueOrder();
-    updateQueueDisplay();
-    updateSpecialCasesDisplay();
-    updateStatistics();
-    updateLastUpdateTime();
+    try {
+        // Atualizar interface inicial
+        updateCurrentTime();
+        updateAnalystAvailability();
+        updateQueueOrder();
+        updateQueueDisplay();
+        updateSpecialCasesDisplay();
+        updateStatistics();
+        updateLastUpdateTime();
+        
+        // Configurar datas dos relatórios
+        setupReportDates();
+        
+        // Verificar reset diário
+        checkDailyReset();
+        
+        // Marcar como inicializado
+        appState.isInitialized = true;
+        
+        console.log('✅ Aplicação inicializada com sucesso');
+        
+        // Mostrar notificação de boas-vindas
+        setTimeout(() => {
+            if (typeof showNotification === 'function') {
+                showNotification('Sistema de fila carregado', 'success');
+            }
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Erro na inicialização:', error);
+        showError('Falha na inicialização do sistema');
+    }
+}
+
+function setupAutoRefresh() {
+    // Limpar intervalo anterior se existir
+    if (appState.autoRefreshInterval) {
+        clearInterval(appState.autoRefreshInterval);
+    }
     
-    // Carregar estado salvo
-    loadState();
+    // Atualizar a cada minuto
+    appState.autoRefreshInterval = setInterval(() => {
+        updateApp();
+    }, 60000); // 60 segundos
     
-    // Verificar reset diário
-    checkDailyReset();
+    // Atualizar tempo a cada segundo (para o relógio)
+    setInterval(() => {
+        updateCurrentTime();
+    }, 1000);
 }
 
 function setupEventListeners() {
-    // Botões principais
-    document.getElementById('addTicketBtn').addEventListener('click', handleNewTicket);
-    document.getElementById('nextAnalystBtn').addEventListener('click', nextAnalyst);
-    document.getElementById('resetQueueBtn').addEventListener('click', resetQueue);
-    document.getElementById('freeAllBtn').addEventListener('click', freeAllAnalysts);
-    document.getElementById('simulateTimeBtn').addEventListener('click', openTimeSimulationModal);
-    document.getElementById('realTimeBtn').addEventListener('click', returnToRealTime);
-    
-    // Modal de simulação
-    document.getElementById('closeTimeModal').addEventListener('click', closeTimeSimulationModal);
-    document.getElementById('cancelSimulation').addEventListener('click', closeTimeSimulationModal);
-    document.getElementById('applySimulation').addEventListener('click', applyTimeSimulation);
-    
-    // Opções de horário no modal
-    document.querySelectorAll('.time-option').forEach(button => {
-        button.addEventListener('click', function() {
-            document.querySelectorAll('.time-option').forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
+    try {
+        // Botões principais
+        document.getElementById('addTicketBtn').addEventListener('click', handleNewTicket);
+        document.getElementById('nextAnalystBtn').addEventListener('click', nextAnalyst);
+        document.getElementById('resetQueueBtn').addEventListener('click', resetQueue);
+        document.getElementById('freeAllBtn').addEventListener('click', freeAllAnalysts);
+        document.getElementById('simulateTimeBtn').addEventListener('click', openTimeSimulationModal);
+        document.getElementById('realTimeBtn').addEventListener('click', returnToRealTime);
+        
+        // Botões de relatório
+        document.getElementById('generateReportBtn').addEventListener('click', openReportModal);
+        document.getElementById('closeReportModal').addEventListener('click', closeReportModal);
+        document.getElementById('cancelReport').addEventListener('click', closeReportModal);
+        document.getElementById('generateCSV').addEventListener('click', generateCSVReport);
+        
+        // Modal de simulação
+        document.getElementById('closeTimeModal').addEventListener('click', closeTimeSimulationModal);
+        document.getElementById('cancelSimulation').addEventListener('click', closeTimeSimulationModal);
+        document.getElementById('applySimulation').addEventListener('click', applyTimeSimulation);
+        
+        // Login
+        document.getElementById('loginBtn').addEventListener('click', handleLogin);
+        document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
         });
-    });
-    
-    // Permitir Enter no campo de número do chamado
-    document.getElementById('newTicketNumber').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            handleNewTicket();
-        }
-    });
-    
-    // Fechar modais com ESC
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal').forEach(modal => {
-                modal.style.display = 'none';
+        
+        // Opções de horário no modal
+        document.querySelectorAll('.time-option').forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.time-option').forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
             });
-        }
-    });
+        });
+        
+        // Permitir Enter no campo de número do chamado
+        document.getElementById('newTicketNumber').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleNewTicket();
+            }
+        });
+        
+        // Fechar modais ao clicar fora
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        });
+        
+        // Hotkeys
+        document.addEventListener('keydown', function(e) {
+            // Ctrl + N = Novo ticket
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                document.getElementById('newTicketNumber').focus();
+            }
+            
+            // Ctrl + F = Liberar todos
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                freeAllAnalysts();
+            }
+            
+            // Ctrl + R = Resetar fila
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault();
+                resetQueue();
+            }
+            
+            // ESC = Fechar modais
+            if (e.key === 'Escape') {
+                closeAllModals();
+            }
+        });
+        
+        console.log('✅ Event listeners configurados');
+        
+    } catch (error) {
+        console.error('❌ Erro ao configurar event listeners:', error);
+    }
+}
+
+function checkSavedState() {
+    // Carregar estado do localStorage
+    loadStateFromLocalStorage();
+    
+    // Se tiver estado salvo, atualizar interface
+    if (localStorage.getItem('queuePortalState')) {
+        showNotification('Estado anterior restaurado', 'info');
+    }
 }
 
 // ============================================
-// FUNÇÕES PRINCIPAIS
+// FUNÇÕES PRINCIPAIS - TEMPO E DISPONIBILIDADE
 // ============================================
 
 function updateCurrentTime() {
-    const now = state.simulatedTime ? new Date(state.simulatedTime) : new Date();
-    
-    // Formatar data
-    const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const dateString = now.toLocaleDateString('pt-BR', dateOptions);
-    
-    // Formatar hora
-    const timeString = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    
-    // Atualizar elementos
-    document.getElementById('currentDate').textContent = dateString;
-    document.getElementById('currentTime').textContent = timeString;
-    
-    // Mostrar/ocultar indicador de simulação
-    const simulationIndicator = document.getElementById('simulationIndicator');
-    const realTimeBtn = document.getElementById('realTimeBtn');
-    
-    if (state.simulatedTime) {
-        simulationIndicator.style.display = 'inline-flex';
-        realTimeBtn.style.display = 'block';
-    } else {
-        simulationIndicator.style.display = 'none';
-        realTimeBtn.style.display = 'none';
+    try {
+        const now = appState.simulatedTime ? new Date(appState.simulatedTime) : new Date();
+        
+        // Formatar data
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const dateString = now.toLocaleDateString('pt-BR', dateOptions);
+        
+        // Formatar hora
+        const timeString = now.toLocaleTimeString('pt-BR', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        
+        // Atualizar elementos
+        const dateElement = document.getElementById('currentDate');
+        const timeElement = document.getElementById('currentTime');
+        
+        if (dateElement) dateElement.textContent = dateString;
+        if (timeElement) timeElement.textContent = timeString;
+        
+        // Mostrar/ocultar indicador de simulação
+        const simulationIndicator = document.getElementById('simulationIndicator');
+        const realTimeBtn = document.getElementById('realTimeBtn');
+        
+        if (appState.simulatedTime) {
+            if (simulationIndicator) simulationIndicator.style.display = 'inline-flex';
+            if (realTimeBtn) realTimeBtn.style.display = 'block';
+        } else {
+            if (simulationIndicator) simulationIndicator.style.display = 'none';
+            if (realTimeBtn) realTimeBtn.style.display = 'none';
+        }
+        
+        // Atualizar disponibilidade dos analistas
+        updateAnalystAvailability();
+        
+    } catch (error) {
+        console.error('❌ Erro ao atualizar hora:', error);
     }
-    
-    updateAnalystAvailability();
 }
 
 function updateAnalystAvailability() {
-    const now = state.simulatedTime ? new Date(state.simulatedTime) : new Date();
+    const now = appState.simulatedTime ? new Date(appState.simulatedTime) : new Date();
     const currentHour = now.getHours();
     const currentMinutes = now.getMinutes();
     const currentTime = currentHour + currentMinutes / 100;
     
-    analysts.forEach(analyst => {
+    window.analysts.forEach(analyst => {
         const startTime = analyst.startTime;
         const endTime = analyst.endTime;
         
@@ -287,18 +425,30 @@ function updateAnalystAvailability() {
             analyst.isBusy = true;
             analyst.isAvailable = false;
         }
+        
+        // Atualizar timestamp da última atividade
+        if (analyst.currentTicket && !analyst.lastActivity) {
+            analyst.lastActivity = new Date();
+        }
     });
     
+    // Atualizar interface
     updateQueueOrder();
     updateQueueDisplay();
     updateSpecialCasesDisplay();
     updateStatistics();
-    saveState();
+    
+    // Salvar estado
+    saveStateToLocalStorage();
 }
+
+// ============================================
+// FUNÇÕES DA FILA
+// ============================================
 
 function updateQueueOrder() {
     // Filtrar apenas analistas N1 disponíveis (não ocupados)
-    const availableAnalysts = analysts.filter(a => 
+    const availableAnalysts = window.analysts.filter(a => 
         a.level === "N1" && 
         a.isAvailable && 
         !a.isBusy && // Não está ocupado com atendimento
@@ -306,24 +456,25 @@ function updateQueueOrder() {
     );
     
     if (availableAnalysts.length === 0) {
-        state.queueOrder = [];
-        state.currentAnalystIndex = 0;
+        appState.queueOrder = [];
+        appState.currentAnalystIndex = 0;
         return;
     }
     
     // Se a fila está vazia ou precisa ser reiniciada
-    if (state.queueOrder.length === 0 || state.currentAnalystIndex >= availableAnalysts.length) {
+    if (appState.queueOrder.length === 0 || appState.currentAnalystIndex >= availableAnalysts.length) {
         // Ordenar por menos chamados atendidos
-        state.queueOrder = [...availableAnalysts].sort((a, b) => {
+        appState.queueOrder = [...availableAnalysts].sort((a, b) => {
             if (a.ticketsHandled !== b.ticketsHandled) {
                 return a.ticketsHandled - b.ticketsHandled;
             }
+            // Em caso de empate, ordenar por ID
             return a.id - b.id;
         });
-        state.currentAnalystIndex = 0;
+        appState.currentAnalystIndex = 0;
     } else {
         // Atualizar fila mantendo ordem
-        state.queueOrder = state.queueOrder
+        appState.queueOrder = appState.queueOrder
             .filter(a => availableAnalysts.some(av => av.id === a.id))
             .map(a => {
                 const updated = availableAnalysts.find(av => av.id === a.id);
@@ -331,21 +482,26 @@ function updateQueueOrder() {
             });
         
         // Ajustar índice se necessário
-        if (state.currentAnalystIndex >= state.queueOrder.length) {
-            state.currentAnalystIndex = 0;
+        if (appState.currentAnalystIndex >= appState.queueOrder.length) {
+            appState.currentAnalystIndex = 0;
         }
     }
 }
 
 function updateQueueDisplay() {
     const queueList = document.getElementById('queueList');
-    const queueAnalysts = analysts.filter(a => a.level === "N1" && a.inQueue);
+    if (!queueList) return;
+    
+    const queueAnalysts = window.analysts.filter(a => a.level === "N1" && a.inQueue);
     
     if (queueAnalysts.length === 0) {
         queueList.innerHTML = `
             <div class="analyst-card offline">
                 <div class="analyst-info">
                     <div class="analyst-name">Nenhum analista configurado</div>
+                    <div style="font-size: 13px; color: var(--sp-text-secondary); margin-top: 8px;">
+                        Configure os horários dos analistas no sistema.
+                    </div>
                 </div>
             </div>
         `;
@@ -355,34 +511,34 @@ function updateQueueDisplay() {
     let queueHTML = '';
     
     // Analista atual
-    if (state.queueOrder.length > 0 && state.currentAnalystIndex < state.queueOrder.length) {
-        const currentAnalyst = state.queueOrder[state.currentAnalystIndex];
+    if (appState.queueOrder.length > 0 && appState.currentAnalystIndex < appState.queueOrder.length) {
+        const currentAnalyst = appState.queueOrder[appState.currentAnalystIndex];
         const statusClass = currentAnalyst.ticketStatus === 'aguardando-cliente' ? 'waiting-client' : 'active';
         queueHTML += createAnalystCardHTML(currentAnalyst, statusClass);
     }
     
     // Próximos analistas
     for (let i = 1; i <= 3; i++) {
-        const nextIndex = (state.currentAnalystIndex + i) % state.queueOrder.length;
-        if (nextIndex < state.queueOrder.length && i < state.queueOrder.length) {
-            const nextAnalyst = state.queueOrder[nextIndex];
+        const nextIndex = (appState.currentAnalystIndex + i) % appState.queueOrder.length;
+        if (nextIndex < appState.queueOrder.length && i < appState.queueOrder.length) {
+            const nextAnalyst = appState.queueOrder[nextIndex];
             const statusClass = i === 1 ? 'next' : '';
             queueHTML += createAnalystCardHTML(nextAnalyst, statusClass);
         }
     }
     
     // Outros analistas
-    const otherAnalysts = analysts.filter(a => 
+    const otherAnalysts = window.analysts.filter(a => 
         a.level === "N1" && 
         a.inQueue && 
         (a.isBusy || a.currentTicket || !a.isAvailable)
     );
     
-    const displayedIds = state.queueOrder.slice(0, 4).map(a => a.id);
+    const displayedIds = appState.queueOrder.slice(0, 4).map(a => a.id);
     const toDisplay = otherAnalysts.filter(a => !displayedIds.includes(a.id));
     
     if (toDisplay.length > 0) {
-        queueHTML += `<div style="margin-top: 20px; color: var(--sp-text-secondary); font-size: 14px; font-weight: 600;">
+        queueHTML += `<div class="other-analysts-header">
             <i class="fas fa-user-clock"></i> Outros Analistas
         </div>`;
         
@@ -392,11 +548,14 @@ function updateQueueDisplay() {
                 statusClass = 'waiting-client';
             } else if (analyst.isBusy) {
                 statusClass = 'busy';
+            } else if (!analyst.isAvailable) {
+                statusClass = 'offline';
             }
             queueHTML += createAnalystCardHTML(analyst, statusClass);
         });
     }
     
+    // Atualizar o DOM
     queueList.innerHTML = queueHTML;
     
     // Adicionar eventos aos botões
@@ -407,6 +566,7 @@ function createAnalystCardHTML(analyst, status) {
     let statusText = '';
     let statusClass = status;
     
+    // Determinar texto do status
     if (status === 'active') {
         statusText = 'ANALISTA ATUAL';
     } else if (status === 'next') {
@@ -422,6 +582,7 @@ function createAnalystCardHTML(analyst, status) {
         statusText = 'DISPONÍVEL';
     }
     
+    // Informações do ticket atual
     let ticketInfo = '';
     if (analyst.currentTicket) {
         const clientName = getClientNameFromTicket(analyst.currentTicket);
@@ -434,27 +595,31 @@ function createAnalystCardHTML(analyst, status) {
                 <i class="fas fa-ticket-alt"></i> 
                 <span class="ticket-number">${analyst.currentTicket}</span>
                 ${statusBadge}
-                ${clientName ? `<div style="font-size: 12px; color: var(--sp-text-secondary); margin-top: 4px;">
+                ${clientName ? `<div class="client-name-info">
                     <i class="fas fa-user"></i> ${clientName}
+                </div>` : ''}
+                ${analyst.lastActivity ? `<div class="last-activity">
+                    <i class="far fa-clock"></i> ${formatTimeSince(analyst.lastActivity)}
                 </div>` : ''}
             </div>
         `;
     }
     
+    // Controles do ticket
     let ticketControls = '';
     if (analyst.currentTicket) {
         ticketControls = `
             <div class="status-buttons">
                 ${analyst.ticketStatus === 'aguardando-cliente' ? `
-                    <button class="status-btn resume resume-ticket-btn" data-analyst-id="${analyst.id}">
+                    <button class="status-btn resume resume-ticket-btn" data-analyst-id="${analyst.id}" title="Retomar atendimento">
                         <i class="fas fa-play"></i> Retomar
                     </button>
                 ` : `
-                    <button class="status-btn waiting waiting-client-btn" data-analyst-id="${analyst.id}">
+                    <button class="status-btn waiting waiting-client-btn" data-analyst-id="${analyst.id}" title="Aguardar retorno do cliente">
                         <i class="fas fa-clock"></i> Aguardar
                     </button>
                 `}
-                <button class="status-btn finish finish-ticket-btn" data-analyst-id="${analyst.id}">
+                <button class="status-btn finish finish-ticket-btn" data-analyst-id="${analyst.id}" title="Finalizar chamado">
                     <i class="fas fa-check"></i> Finalizar
                 </button>
             </div>
@@ -464,13 +629,15 @@ function createAnalystCardHTML(analyst, status) {
             <input type="text" class="input-field assign-ticket-input" 
                    placeholder="Nº Chamado" 
                    data-analyst-id="${analyst.id}"
+                   title="Digite o número do chamado"
                    style="font-size: 12px; padding: 6px 10px;">
-            <button class="btn btn-small assign-ticket-btn" data-analyst-id="${analyst.id}">
+            <button class="btn btn-small assign-ticket-btn" data-analyst-id="${analyst.id}" title="Atribuir chamado">
                 <i class="fas fa-paperclip"></i> Atribuir
             </button>
         `;
     }
     
+    // HTML final do card
     return `
         <div class="analyst-card ${statusClass}" data-analyst-id="${analyst.id}">
             <div class="analyst-info">
@@ -483,7 +650,7 @@ function createAnalystCardHTML(analyst, status) {
                     ${analyst.startTime}h - ${analyst.endTime}h
                 </div>
                 ${ticketInfo}
-                <div style="font-size: 12px; color: var(--sp-text-secondary); margin-top: 6px;">
+                <div class="tickets-today">
                     <i class="fas fa-tasks"></i> Chamados hoje: ${analyst.ticketsHandled}
                 </div>
             </div>
@@ -494,7 +661,7 @@ function createAnalystCardHTML(analyst, status) {
                     <span>${statusText}</span>
                 </div>
                 ${analyst.specialClient ? `
-                    <div style="font-size: 11px; color: var(--sp-purple); margin-top: 4px;">
+                    <div class="special-client-badge">
                         <i class="fas fa-star"></i> ${analyst.specialClient}
                     </div>
                 ` : ''}
@@ -520,12 +687,26 @@ function getStatusDotClass(analyst) {
 }
 
 function getClientNameFromTicket(ticket) {
-    const specialClient = specialClients.find(c => 
+    const specialClient = window.specialClients.find(c => 
         c.analyst === "Eric" && ticket === "TIM" ||
         c.analyst === "Tamiris" && ticket === "DPSP" ||
         c.analyst === "André" && ticket === "Benoit"
     );
     return specialClient ? specialClient.client : null;
+}
+
+function formatTimeSince(date) {
+    if (!date) return '';
+    
+    const now = new Date();
+    const diffMs = now - new Date(date);
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Agora mesmo';
+    if (diffMins < 60) return `Há ${diffMins} min`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    return `Há ${diffHours} h`;
 }
 
 function attachAnalystCardEvents() {
@@ -534,11 +715,11 @@ function attachAnalystCardEvents() {
         button.addEventListener('click', function() {
             const analystId = parseInt(this.getAttribute('data-analyst-id'));
             const input = document.querySelector(`.assign-ticket-input[data-analyst-id="${analystId}"]`);
-            const ticketNumber = input.value.trim();
+            const ticketNumber = input?.value.trim();
             
             if (ticketNumber) {
                 assignTicketToAnalyst(analystId, ticketNumber, 'normal', 'atendendo');
-                input.value = '';
+                if (input) input.value = '';
             } else {
                 showNotification('Digite um número de chamado', 'warning');
             }
@@ -570,84 +751,38 @@ function attachAnalystCardEvents() {
     });
 }
 
-function updateSpecialCasesDisplay() {
-    const specialCasesDiv = document.getElementById('specialCases');
-    let specialCasesHTML = '';
-    
-    specialClients.forEach(special => {
-        const analyst = analysts.find(a => a.name === special.analyst);
-        const isAvailable = analyst ? analyst.isAvailable && !analyst.isBusy : false;
-        const isBusy = analyst ? (analyst.isBusy && analyst.ticketStatus !== 'aguardando-cliente') || analyst.currentTicket === special.client : false;
-        const isWaiting = analyst ? analyst.ticketStatus === 'aguardando-cliente' : false;
-        
-        specialCasesHTML += `
-            <div class="special-client">
-                <div class="client-info">
-                    <div class="client-name">Cliente ${special.client}</div>
-                    <div style="font-size: 13px; color: var(--sp-text-secondary); margin-top: 4px;">
-                        Atendimento dedicado
-                    </div>
-                </div>
-                <div>
-                    <div class="assigned-analyst">${special.analyst} (${special.level})</div>
-                    <div style="margin-top: 12px; text-align: center;">
-                        <div class="status-indicator">
-                            <span class="status-dot ${isWaiting ? 'status-waiting' : isBusy ? 'status-busy' : isAvailable ? 'status-available' : 'status-offline'}"></span>
-                            <span style="font-size: 12px;">
-                                ${isWaiting ? 'AGUARDANDO' : isBusy ? 'ATENDENDO' : isAvailable ? 'DISPONÍVEL' : 'INDISPONÍVEL'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    specialCasesDiv.innerHTML = specialCasesHTML;
-}
-
-function updateStatistics() {
-    // Chamados hoje
-    document.getElementById('totalTickets').textContent = state.ticketsToday;
-    
-    // Analistas ativos
-    const activeAnalysts = analysts.filter(a => a.isAvailable && !a.isBusy).length;
-    document.getElementById('activeAnalysts').textContent = activeAnalysts;
-    
-    // Próximo na fila
-    let nextInQueue = '-';
-    if (state.queueOrder.length > 0) {
-        const nextIndex = (state.currentAnalystIndex + 1) % state.queueOrder.length;
-        if (nextIndex < state.queueOrder.length) {
-            nextInQueue = state.queueOrder[nextIndex].name;
-        }
-    }
-    document.getElementById('nextInQueue').textContent = nextInQueue;
-    
-    // Chamados especiais
-    document.getElementById('specialTickets').textContent = state.specialTicketsToday;
-    
-    // Chamados aguardando cliente
-    const waitingTickets = analysts.filter(a => a.ticketStatus === 'aguardando-cliente').length;
-    document.getElementById('waitingTickets').textContent = waitingTickets;
-    state.waitingTicketsToday = waitingTickets;
-    
-    // Último reset
-    document.getElementById('lastResetDate').textContent = state.lastReset;
-    document.getElementById('lastResetInfo').textContent = `Fila reiniciada em: ${state.lastReset}`;
-}
+// ============================================
+// FUNÇÕES DE TICKETS
+// ============================================
 
 function handleNewTicket() {
     const ticketNumberInput = document.getElementById('newTicketNumber');
     const ticketTypeSelect = document.getElementById('ticketType');
     
+    if (!ticketNumberInput || !ticketTypeSelect) {
+        showNotification('Elementos do formulário não encontrados', 'error');
+        return;
+    }
+    
     let ticketNumber = ticketNumberInput.value.trim();
     const ticketType = ticketTypeSelect.value;
     
+    // Validação básica
+    if (ticketNumber && ticketNumber.length < 3) {
+        showNotification('Número do chamado muito curto', 'warning');
+        return;
+    }
+    
     // Gerar número automático se não informado
     if (!ticketNumber) {
-        ticketNumber = `CH-${state.nextTicketNumber}`;
-        state.nextTicketNumber++;
+        ticketNumber = `CH-${appState.nextTicketNumber}`;
+        appState.nextTicketNumber++;
+    }
+    
+    // Verificar se ticket já existe
+    if (isTicketAlreadyExists(ticketNumber)) {
+        showNotification(`Chamado ${ticketNumber} já está em atendimento`, 'warning');
+        return;
     }
     
     // Processar chamado
@@ -659,22 +794,34 @@ function handleNewTicket() {
     
     // Limpar campo
     ticketNumberInput.value = '';
-    saveState();
+    ticketNumberInput.focus();
+    
+    // Salvar estado
+    saveStateToLocalStorage();
+}
+
+function isTicketAlreadyExists(ticketNumber) {
+    return window.analysts.some(analyst => 
+        analyst.currentTicket === ticketNumber || 
+        analyst.currentTicket === getClientNameFromTicket(ticketNumber)
+    );
 }
 
 function handleNormalTicket(ticketNumber) {
-    if (state.queueOrder.length === 0) {
+    if (appState.queueOrder.length === 0) {
         showNotification('Nenhum analista disponível na fila!', 'warning');
         return;
     }
     
-    const currentAnalyst = state.queueOrder[state.currentAnalystIndex];
+    const currentAnalyst = appState.queueOrder[appState.currentAnalystIndex];
     
-    if (!currentAnalyst.isAvailable || (currentAnalyst.isBusy && currentAnalyst.ticketStatus !== 'aguardando-cliente')) {
-        showNotification(`${currentAnalyst.name} não está disponível. Indo para o próximo...`, 'warning');
+    if (!currentAnalyst || !currentAnalyst.isAvailable || 
+        (currentAnalyst.isBusy && currentAnalyst.ticketStatus !== 'aguardando-cliente')) {
+        
+        showNotification(`${currentAnalyst?.name || 'Analista'} não está disponível. Indo para o próximo...`, 'warning');
         nextAnalyst();
         
-        const newCurrentAnalyst = state.queueOrder[state.currentAnalystIndex];
+        const newCurrentAnalyst = appState.queueOrder[appState.currentAnalystIndex];
         if (newCurrentAnalyst && newCurrentAnalyst.isAvailable && !newCurrentAnalyst.isBusy) {
             assignTicketToAnalyst(newCurrentAnalyst.id, ticketNumber, 'normal', 'atendendo');
         } else {
@@ -685,13 +832,13 @@ function handleNormalTicket(ticketNumber) {
     
     assignTicketToAnalyst(currentAnalyst.id, ticketNumber, 'normal', 'atendendo');
     nextAnalyst();
-    state.ticketsToday++;
+    appState.ticketsToday++;
     
     showNotification(`Chamado ${ticketNumber} atribuído a ${currentAnalyst.name}`, 'success');
 }
 
 function handleSpecialTicket(ticketNumber, ticketType) {
-    const specialClient = specialClients.find(c => 
+    const specialClient = window.specialClients.find(c => 
         ticketType === 'TIM' ? c.client === 'TIM' :
         ticketType === 'DPSP' ? c.client === 'DPSP' :
         ticketType === 'Benoit' ? c.client === 'Benoit' : false
@@ -702,7 +849,7 @@ function handleSpecialTicket(ticketNumber, ticketType) {
         return;
     }
     
-    const analyst = analysts.find(a => a.name === specialClient.analyst);
+    const analyst = window.analysts.find(a => a.name === specialClient.analyst);
     
     if (!analyst) {
         showNotification(`Analista ${specialClient.analyst} não encontrado!`, 'error');
@@ -715,20 +862,24 @@ function handleSpecialTicket(ticketNumber, ticketType) {
     }
     
     assignTicketToAnalyst(analyst.id, ticketNumber, ticketType, 'atendendo');
-    state.ticketsToday++;
-    state.specialTicketsToday++;
+    appState.ticketsToday++;
+    appState.specialTicketsToday++;
     
     showNotification(`Chamado especial ${ticketNumber} atribuído a ${analyst.name}`, 'success');
 }
 
 function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus = 'atendendo') {
-    const analyst = analysts.find(a => a.id === analystId);
+    const analyst = window.analysts.find(a => a.id === analystId);
     
-    if (!analyst) return;
+    if (!analyst) {
+        console.error(`Analista com ID ${analystId} não encontrado`);
+        return;
+    }
     
     analyst.isBusy = ticketStatus === 'atendendo';
     analyst.currentTicket = ticketNumber;
     analyst.ticketStatus = ticketStatus;
+    analyst.lastActivity = new Date();
     
     // Tratamento para clientes especiais
     if (ticketType !== 'normal') {
@@ -749,20 +900,30 @@ function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus
         analyst.inQueue = false;
     }
     
+    // Atualizar interface
     updateQueueOrder();
     updateQueueDisplay();
     updateSpecialCasesDisplay();
     updateStatistics();
+    
+    // Salvar no Firebase se disponível
+    if (window.firebaseAppIntegration?.saveTicketToFirebase) {
+        window.firebaseAppIntegration.saveTicketToFirebase(ticketNumber, analyst.name, 'iniciado');
+    }
+    
+    // Salvar localmente
+    saveStateToLocalStorage();
 }
 
 function setTicketWaiting(analystId) {
-    const analyst = analysts.find(a => a.id === analystId);
+    const analyst = window.analysts.find(a => a.id === analystId);
     
     if (!analyst) return;
     
     // Colocar o chamado em espera (aguardando cliente)
     analyst.ticketStatus = 'aguardando-cliente';
     analyst.isBusy = false; // Fica disponível para nova chamada
+    analyst.lastActivity = new Date();
     
     // Retornar à fila se for analista N1
     if (analyst.level === "N1" && analyst.inQueue) {
@@ -774,17 +935,18 @@ function setTicketWaiting(analystId) {
     updateStatistics();
     
     showNotification(`${analyst.name} está aguardando retorno do cliente`, 'info');
-    saveState();
+    saveStateToLocalStorage();
 }
 
 function resumeTicket(analystId) {
-    const analyst = analysts.find(a => a.id === analystId);
+    const analyst = window.analysts.find(a => a.id === analystId);
     
     if (!analyst) return;
     
     // Retomar o atendimento do chamado em espera
     analyst.ticketStatus = 'atendendo';
     analyst.isBusy = true;
+    analyst.lastActivity = new Date();
     
     // Se estiver na fila, remover temporariamente
     if (analyst.level === "N1" && analyst.inQueue) {
@@ -796,20 +958,26 @@ function resumeTicket(analystId) {
     updateStatistics();
     
     showNotification(`${analyst.name} retomou o atendimento`, 'success');
-    saveState();
+    saveStateToLocalStorage();
 }
 
 function finishTicket(analystId) {
-    const analyst = analysts.find(a => a.id === analystId);
+    const analyst = window.analysts.find(a => a.id === analystId);
     
     if (!analyst) return;
     
     const ticketNumber = analyst.currentTicket;
     
+    // Salvar histórico antes de limpar
+    if (ticketNumber && window.firebaseAppIntegration?.saveTicketToFirebase) {
+        window.firebaseAppIntegration.saveTicketToFirebase(ticketNumber, analyst.name, 'finalizado');
+    }
+    
     // Finalizar o chamado
     analyst.isBusy = false;
     analyst.currentTicket = null;
     analyst.ticketStatus = null;
+    analyst.lastActivity = null;
     
     // Reintegrar à fila se for Eric ou Tamiris (casos especiais)
     if (analyst.name === "Eric" || analyst.name === "Tamiris") {
@@ -821,18 +989,76 @@ function finishTicket(analystId) {
     updateSpecialCasesDisplay();
     updateStatistics();
     
-    showNotification(`Chamado ${ticketNumber} finalizado por ${analyst.name}`, 'success');
-    saveState();
+    showNotification(`Chamado ${ticketNumber || 'desconhecido'} finalizado por ${analyst.name}`, 'success');
+    saveStateToLocalStorage();
+}
+
+// ============================================
+// FUNÇÕES DE CONTROLE DA FILA
+// ============================================
+
+function nextAnalyst() {
+    if (appState.queueOrder.length === 0) {
+        showNotification('Não há analistas na fila!', 'warning');
+        return;
+    }
+    
+    appState.currentAnalystIndex = (appState.currentAnalystIndex + 1) % appState.queueOrder.length;
+    updateQueueDisplay();
+    updateStatistics();
+    
+    const currentAnalyst = appState.queueOrder[appState.currentAnalystIndex];
+    showNotification(`Próximo analista: ${currentAnalyst.name}`, 'info');
+    
+    saveStateToLocalStorage();
+}
+
+function resetQueue() {
+    if (!confirm('Tem certeza que deseja reiniciar a fila do dia?\n\nIsso irá:\n• Zerar todos os contadores\n• Liberar todos os analistas\n• Reiniciar a ordem da fila')) {
+        return;
+    }
+    
+    appState.currentAnalystIndex = 0;
+    appState.queueOrder = [];
+    appState.lastReset = new Date().toLocaleDateString('pt-BR');
+    appState.dailyResetDone = false;
+    
+    window.analysts.forEach(analyst => {
+        analyst.ticketsHandled = 0;
+        analyst.isBusy = false;
+        analyst.currentTicket = null;
+        analyst.ticketStatus = null;
+        analyst.lastActivity = null;
+        analyst.inQueue = analyst.level === "N1";
+    });
+    
+    appState.ticketsToday = 0;
+    appState.specialTicketsToday = 0;
+    appState.waitingTicketsToday = 0;
+    appState.nextTicketNumber = 1000;
+    
+    updateQueueOrder();
+    updateQueueDisplay();
+    updateSpecialCasesDisplay();
+    updateStatistics();
+    
+    showNotification('Fila reiniciada para o novo dia!', 'success');
+    saveStateToLocalStorage();
 }
 
 function freeAllAnalysts() {
+    if (!confirm('Liberar TODOS os analistas?\n\nIsso irá finalizar todos os atendimentos em andamento.')) {
+        return;
+    }
+    
     let freedCount = 0;
     
-    analysts.forEach(analyst => {
+    window.analysts.forEach(analyst => {
         if (analyst.isBusy || analyst.currentTicket) {
             analyst.isBusy = false;
             analyst.currentTicket = null;
             analyst.ticketStatus = null;
+            analyst.lastActivity = null;
             analyst.inQueue = analyst.level === "N1";
             freedCount++;
         }
@@ -844,65 +1070,108 @@ function freeAllAnalysts() {
     updateStatistics();
     
     showNotification(`${freedCount} analistas liberados`, 'success');
-    saveState();
-}
-
-function nextAnalyst() {
-    if (state.queueOrder.length === 0) {
-        showNotification('Não há analistas na fila!', 'warning');
-        return;
-    }
-    
-    state.currentAnalystIndex = (state.currentAnalystIndex + 1) % state.queueOrder.length;
-    updateQueueDisplay();
-    updateStatistics();
-    
-    const currentAnalyst = state.queueOrder[state.currentAnalystIndex];
-    showNotification(`Próximo analista: ${currentAnalyst.name}`, 'info');
-    
-    saveState();
-}
-
-function resetQueue() {
-    if (!confirm('Tem certeza que deseja reiniciar a fila do dia?')) {
-        return;
-    }
-    
-    state.currentAnalystIndex = 0;
-    state.queueOrder = [];
-    state.lastReset = new Date().toLocaleDateString('pt-BR');
-    state.dailyResetDone = false;
-    
-    analysts.forEach(analyst => {
-        analyst.ticketsHandled = 0;
-        analyst.isBusy = false;
-        analyst.currentTicket = null;
-        analyst.ticketStatus = null;
-        analyst.inQueue = analyst.level === "N1";
-    });
-    
-    state.ticketsToday = 0;
-    state.specialTicketsToday = 0;
-    state.waitingTicketsToday = 0;
-    state.nextTicketNumber = 1000;
-    
-    updateQueueOrder();
-    updateQueueDisplay();
-    updateSpecialCasesDisplay();
-    updateStatistics();
-    
-    showNotification('Fila reiniciada para o novo dia!', 'success');
-    saveState();
+    saveStateToLocalStorage();
 }
 
 function checkDailyReset() {
     const now = new Date();
     const today = now.toLocaleDateString('pt-BR');
     
-    if (today !== state.lastReset && !state.dailyResetDone) {
+    if (today !== appState.lastReset && !appState.dailyResetDone) {
         resetQueue();
-        state.dailyResetDone = true;
+        appState.dailyResetDone = true;
     }
+}
+
+// ============================================
+// FUNÇÕES DE INTERFACE
+// ============================================
+
+function updateSpecialCasesDisplay() {
+    const specialCasesDiv = document.getElementById('specialCases');
+    if (!specialCasesDiv) return;
+    
+    let specialCasesHTML = '';
+    
+    window.specialClients.forEach(special => {
+        const analyst = window.analysts.find(a => a.name === special.analyst);
+        const isAvailable = analyst ? analyst.isAvailable && !analyst.isBusy : false;
+        const isBusy = analyst ? (analyst.isBusy && analyst.ticketStatus !== 'aguardando-cliente') || analyst.currentTicket === special.client : false;
+        const isWaiting = analyst ? analyst.ticketStatus === 'aguardando-cliente' : false;
+        
+        specialCasesHTML += `
+            <div class="special-client">
+                <div class="client-info">
+                    <div class="client-name">Cliente ${special.client}</div>
+                    <div class="client-description">
+                        Atendimento dedicado
+                    </div>
+                </div>
+                <div>
+                    <div class="assigned-analyst">${special.analyst} (${special.level})</div>
+                    <div class="status-container">
+                        <div class="status-indicator">
+                            <span class="status-dot ${isWaiting ? 'status-waiting' : isBusy ? 'status-busy' : isAvailable ? 'status-available' : 'status-offline'}"></span>
+                            <span class="status-text">
+                                ${isWaiting ? 'AGUARDANDO' : isBusy ? 'ATENDENDO' : isAvailable ? 'DISPONÍVEL' : 'INDISPONÍVEL'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    specialCasesDiv.innerHTML = specialCasesHTML;
+}
+
+function updateStatistics() {
+    // Chamados hoje
+    updateElementText('totalTickets', appState.ticketsToday);
+    
+    // Analistas ativos
+    const activeAnalysts = window.analysts.filter(a => a.isAvailable && !a.isBusy).length;
+    updateElementText('activeAnalysts', activeAnalysts);
+    
+    // Próximo na fila
+    let nextInQueue = '-';
+    if (appState.queueOrder.length > 0) {
+        const nextIndex = (appState.currentAnalystIndex + 1) % appState.queueOrder.length;
+        if (nextIndex < appState.queueOrder.length) {
+            nextInQueue = appState.queueOrder[nextIndex].name;
+        }
+    }
+    updateElementText('nextInQueue', nextInQueue);
+    
+    // Chamados especiais
+    updateElementText('specialTickets', appState.specialTicketsToday);
+    
+    // Chamados aguardando cliente
+    const waitingTickets = window.analysts.filter(a => a.ticketStatus === 'aguardando-cliente').length;
+    updateElementText('waitingTickets', waitingTickets);
+    appState.waitingTicketsToday = waitingTickets;
+    
+    // Último reset
+    updateElementText('lastResetDate', appState.lastReset);
+    updateElementText('lastResetInfo', `Fila reiniciada em: ${appState.lastReset}`);
+}
+
+function updateElementText(id, text) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.textContent = text;
+    }
+}
+
+function updateLastUpdateTime() {
+    appState.lastUpdate = new Date().toLocaleTimeString('pt-BR');
+    updateElementText('lastUpdate', appState.lastUpdate);
+}
+
+function updateApp() {
+    updateCurrentTime();
+    updateLastUpdateTime();
+    checkDailyReset();
 }
 
 // ============================================
@@ -910,11 +1179,17 @@ function checkDailyReset() {
 // ============================================
 
 function openTimeSimulationModal() {
-    document.getElementById('timeSimulationModal').style.display = 'flex';
+    const modal = document.getElementById('timeSimulationModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
 }
 
 function closeTimeSimulationModal() {
-    document.getElementById('timeSimulationModal').style.display = 'none';
+    const modal = document.getElementById('timeSimulationModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 function applyTimeSimulation() {
@@ -928,36 +1203,250 @@ function applyTimeSimulation() {
     const hour = parseInt(selectedButton.getAttribute('data-hour'));
     const simulatedDate = new Date();
     simulatedDate.setHours(hour, 0, 0, 0);
-    state.simulatedTime = simulatedDate;
+    appState.simulatedTime = simulatedDate;
     
     closeTimeSimulationModal();
     updateCurrentTime();
     
     showNotification(`Horário simulado: ${hour}:00`, 'success');
+    saveStateToLocalStorage();
 }
 
 function returnToRealTime() {
-    state.simulatedTime = null;
+    appState.simulatedTime = null;
     updateCurrentTime();
     showNotification('Voltando ao horário real', 'info');
+    saveStateToLocalStorage();
+}
+
+// ============================================
+// FUNÇÕES DE RELATÓRIO CSV
+// ============================================
+
+function setupReportDates() {
+    const today = new Date();
+    const lastWeek = new Date();
+    lastWeek.setDate(today.getDate() - 7);
+    
+    updateElementValue('startDate', lastWeek.toISOString().split('T')[0]);
+    updateElementValue('endDate', today.toISOString().split('T')[0]);
+}
+
+function updateElementValue(id, value) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.value = value;
+    }
+}
+
+function openReportModal() {
+    const modal = document.getElementById('reportModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeReportModal() {
+    const modal = document.getElementById('reportModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function closeAllModals() {
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.style.display = 'none';
+    });
+}
+
+async function generateCSVReport() {
+    // Verificar se Firebase está disponível
+    if (!window.firebaseAppIntegration || !window.firebaseAppIntegration.getTicketsByDateRange) {
+        showNotification('Funcionalidade de relatórios não disponível', 'error');
+        return;
+    }
+    
+    const startDate = document.getElementById('startDate')?.value;
+    const endDate = document.getElementById('endDate')?.value;
+    const includeAllTickets = document.getElementById('includeAllTickets')?.checked;
+    
+    if (!startDate || !endDate) {
+        showNotification('Selecione as datas inicial e final', 'warning');
+        return;
+    }
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    
+    if (start > end) {
+        showNotification('A data inicial não pode ser maior que a data final', 'error');
+        return;
+    }
+    
+    try {
+        showNotification('Gerando relatório...', 'info');
+        
+        const tickets = await window.firebaseAppIntegration.getTicketsByDateRange(startDate, endDate, includeAllTickets);
+        
+        if (!tickets || tickets.length === 0) {
+            showNotification('Nenhum chamado encontrado no período selecionado', 'warning');
+            return;
+        }
+        
+        const csvContent = createCSVContent(tickets);
+        downloadCSV(csvContent, startDate, endDate);
+        
+        closeReportModal();
+        showNotification(`Relatório CSV gerado com ${tickets.length} registros`, 'success');
+        
+    } catch (error) {
+        console.error('Erro ao gerar relatório:', error);
+        showNotification('Erro ao gerar relatório: ' + error.message, 'error');
+    }
+}
+
+function createCSVContent(tickets) {
+    let csv = 'Número do Chamado,Analista,Data de Atendimento,Status,Hora,Data Completa\n';
+    
+    tickets.forEach(ticket => {
+        const dateObj = ticket.timestamp instanceof Date ? ticket.timestamp : new Date(ticket.timestamp);
+        const dateStr = dateObj.toLocaleDateString('pt-BR');
+        const timeStr = dateObj.toLocaleTimeString('pt-BR');
+        const fullDate = dateObj.toISOString();
+        
+        const ticketNumber = `"${ticket.ticketNumber}"`;
+        const analyst = `"${ticket.analyst}"`;
+        const date = `"${dateStr}"`;
+        const status = `"${ticket.status}"`;
+        const time = `"${timeStr}"`;
+        const fullDateTime = `"${fullDate}"`;
+        
+        csv += `${ticketNumber},${analyst},${date},${status},${time},${fullDateTime}\n`;
+    });
+    
+    return csv;
+}
+
+function downloadCSV(csvContent, startDate, endDate) {
+    const startFormatted = startDate.replace(/-/g, '');
+    const endFormatted = endDate.replace(/-/g, '');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `relatorio_chamados_${startFormatted}_a_${endFormatted}_${timestamp}.csv`;
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    URL.revokeObjectURL(url);
+}
+
+// ============================================
+// FUNÇÕES DE LOGIN (INTEGRAÇÃO COM FIREBASE)
+// ============================================
+
+function handleLogin() {
+    const email = document.getElementById('loginEmail')?.value;
+    const password = document.getElementById('loginPassword')?.value;
+    const rememberMe = document.getElementById('rememberMe')?.checked;
+    
+    if (!email || !password) {
+        showLoginError('Preencha e-mail e senha');
+        return;
+    }
+    
+    // Se Firebase estiver disponível, usar autenticação Firebase
+    if (window.firebaseAppIntegration?.handleLogin) {
+        window.firebaseAppIntegration.handleLogin(email, password, rememberMe);
+    } else {
+        // Fallback para login local (apenas para desenvolvimento)
+        handleLocalLogin(email, password);
+    }
+}
+
+function handleLocalLogin(email, password) {
+    // Apenas para desenvolvimento - NÃO USAR EM PRODUÇÃO
+    console.warn('⚠️ Usando login local (modo desenvolvimento)');
+    
+    if (email.includes('@payhub') && password === 'dev123') {
+        showNotification('Login local bem-sucedido (modo dev)', 'success');
+        hideLoginModal();
+        
+        // Simular usuário logado
+        if (window.firebaseAppIntegration?.appState) {
+            window.firebaseAppIntegration.appState.user = {
+                email: email,
+                name: email.split('@')[0]
+            };
+            updateUserInfo();
+            enableAppControls();
+        }
+    } else {
+        showLoginError('Credenciais inválidas (use: qualquer@payhub / dev123)');
+    }
+}
+
+function showLoginError(message) {
+    const errorElement = document.getElementById('loginError');
+    const errorMessage = document.getElementById('loginErrorMessage');
+    
+    if (errorElement && errorMessage) {
+        errorMessage.textContent = message;
+        errorElement.style.display = 'block';
+        
+        // Esconder após 5 segundos
+        setTimeout(() => {
+            errorElement.style.display = 'none';
+        }, 5000);
+    }
+}
+
+function hideLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function updateUserInfo() {
+    const userNameElement = document.getElementById('userName');
+    if (userNameElement && window.firebaseAppIntegration?.appState?.user) {
+        userNameElement.textContent = window.firebaseAppIntegration.appState.user.name;
+    }
+}
+
+function enableAppControls() {
+    const buttons = ['addTicketBtn', 'nextAnalystBtn', 'resetQueueBtn', 'freeAllBtn', 
+                   'simulateTimeBtn', 'generateReportBtn', 'realTimeBtn'];
+    
+    buttons.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            btn.disabled = false;
+        }
+    });
 }
 
 // ============================================
 // FUNÇÕES AUXILIARES
 // ============================================
 
-function updateApp() {
-    updateCurrentTime();
-    updateLastUpdateTime();
-    checkDailyReset();
-}
-
-function updateLastUpdateTime() {
-    state.lastUpdate = new Date().toLocaleTimeString('pt-BR');
-    document.getElementById('lastUpdate').textContent = state.lastUpdate;
-}
-
 function showNotification(message, type = 'success') {
+    // Verificar se a função já existe (pode estar no Firebase integration)
+    if (typeof window.showNotification === 'function') {
+        window.showNotification(message, type);
+        return;
+    }
+    
+    // Implementação local
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.innerHTML = `
@@ -977,54 +1466,60 @@ function showNotification(message, type = 'success') {
     }, 5000);
 }
 
-function saveState() {
+function showError(message) {
+    showNotification(message, 'error');
+}
+
+function saveStateToLocalStorage() {
     try {
         const stateToSave = {
-            ...state,
-            simulatedTime: state.simulatedTime ? state.simulatedTime.getTime() : null,
-            analysts: analysts.map(a => ({
+            ...appState,
+            simulatedTime: appState.simulatedTime ? appState.simulatedTime.getTime() : null,
+            analysts: window.analysts.map(a => ({
                 id: a.id,
                 ticketsHandled: a.ticketsHandled,
                 isBusy: a.isBusy,
                 currentTicket: a.currentTicket,
                 ticketStatus: a.ticketStatus,
-                inQueue: a.inQueue
+                inQueue: a.inQueue,
+                lastActivity: a.lastActivity
             }))
         };
         
         localStorage.setItem('queuePortalState', JSON.stringify(stateToSave));
     } catch (e) {
-        console.error('Erro ao salvar estado:', e);
+        console.error('❌ Erro ao salvar estado:', e);
     }
 }
 
-function loadState() {
+function loadStateFromLocalStorage() {
     try {
         const savedState = localStorage.getItem('queuePortalState');
         if (savedState) {
             const parsedState = JSON.parse(savedState);
             
-            state.ticketsToday = parsedState.ticketsToday || 0;
-            state.specialTicketsToday = parsedState.specialTicketsToday || 0;
-            state.waitingTicketsToday = parsedState.waitingTicketsToday || 0;
-            state.lastReset = parsedState.lastReset || new Date().toLocaleDateString('pt-BR');
-            state.currentAnalystIndex = parsedState.currentAnalystIndex || 0;
-            state.nextTicketNumber = parsedState.nextTicketNumber || 1000;
-            state.dailyResetDone = parsedState.dailyResetDone || false;
+            appState.ticketsToday = parsedState.ticketsToday || 0;
+            appState.specialTicketsToday = parsedState.specialTicketsToday || 0;
+            appState.waitingTicketsToday = parsedState.waitingTicketsToday || 0;
+            appState.lastReset = parsedState.lastReset || new Date().toLocaleDateString('pt-BR');
+            appState.currentAnalystIndex = parsedState.currentAnalystIndex || 0;
+            appState.nextTicketNumber = parsedState.nextTicketNumber || 1000;
+            appState.dailyResetDone = parsedState.dailyResetDone || false;
             
             if (parsedState.simulatedTime) {
-                state.simulatedTime = new Date(parsedState.simulatedTime);
+                appState.simulatedTime = new Date(parsedState.simulatedTime);
             }
             
             if (parsedState.analysts) {
                 parsedState.analysts.forEach(savedAnalyst => {
-                    const analyst = analysts.find(a => a.id === savedAnalyst.id);
+                    const analyst = window.analysts.find(a => a.id === savedAnalyst.id);
                     if (analyst) {
                         analyst.ticketsHandled = savedAnalyst.ticketsHandled || 0;
                         analyst.isBusy = savedAnalyst.isBusy || false;
                         analyst.currentTicket = savedAnalyst.currentTicket || null;
                         analyst.ticketStatus = savedAnalyst.ticketStatus || null;
                         analyst.inQueue = savedAnalyst.inQueue !== undefined ? savedAnalyst.inQueue : true;
+                        analyst.lastActivity = savedAnalyst.lastActivity ? new Date(savedAnalyst.lastActivity) : null;
                     }
                 });
             }
@@ -1034,13 +1529,128 @@ function loadState() {
             updateSpecialCasesDisplay();
             updateStatistics();
             
-            showNotification('Estado anterior restaurado', 'info');
+            console.log('✅ Estado carregado do localStorage');
         }
     } catch (e) {
-        console.error('Erro ao carregar estado:', e);
+        console.error('❌ Erro ao carregar estado:', e);
+        // Se der erro, limpar localStorage corrompido
+        localStorage.removeItem('queuePortalState');
     }
 }
 
-// Exportar para uso global (se necessário)
-window.appState = state;
-window.analysts = analysts;
+function exportBackup() {
+    const backup = {
+        version: '2.0.0',
+        timestamp: new Date().toISOString(),
+        appState: appState,
+        analysts: window.analysts,
+        specialClients: window.specialClients
+    };
+    
+    const dataStr = JSON.stringify(backup, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `backup-fila-payhub-${new Date().toISOString().split('T')[0]}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    
+    showNotification('Backup exportado com sucesso', 'success');
+}
+
+function importBackup(file) {
+    if (!file) return;
+    
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        try {
+            const backup = JSON.parse(e.target.result);
+            
+            if (!backup.version || !backup.appState || !backup.analysts) {
+                throw new Error('Formato de backup inválido');
+            }
+            
+            if (!confirm(`Restaurar backup de ${backup.timestamp || 'data desconhecida'}?`)) {
+                return;
+            }
+            
+            // Restaurar estado
+            Object.assign(appState, backup.appState);
+            
+            // Restaurar analistas
+            backup.analysts.forEach(backupAnalyst => {
+                const analyst = window.analysts.find(a => a.id === backupAnalyst.id);
+                if (analyst) {
+                    Object.assign(analyst, backupAnalyst);
+                }
+            });
+            
+            // Atualizar interface
+            updateCurrentTime();
+            updateQueueOrder();
+            updateQueueDisplay();
+            updateSpecialCasesDisplay();
+            updateStatistics();
+            
+            // Salvar no localStorage
+            saveStateToLocalStorage();
+            
+            showNotification('Backup restaurado com sucesso', 'success');
+            
+        } catch (error) {
+            console.error('❌ Erro ao importar backup:', error);
+            showNotification('Erro ao importar backup: ' + error.message, 'error');
+        }
+    };
+    
+    reader.readAsText(file);
+}
+
+// ============================================
+// EXPORTAR FUNÇÕES PARA USO GLOBAL
+// ============================================
+
+window.appController = {
+    // Estado
+    appState: appState,
+    analysts: window.analysts,
+    specialClients: window.specialClients,
+    
+    // Funções principais
+    updateCurrentTime,
+    updateAnalystAvailability,
+    updateQueueDisplay,
+    updateStatistics,
+    
+    // Controles de tickets
+    handleNewTicket,
+    assignTicketToAnalyst,
+    finishTicket,
+    setTicketWaiting,
+    resumeTicket,
+    
+    // Controles da fila
+    nextAnalyst,
+    resetQueue,
+    freeAllAnalysts,
+    
+    // Simulação
+    openTimeSimulationModal,
+    applyTimeSimulation,
+    returnToRealTime,
+    
+    // Relatórios
+    generateCSVReport,
+    exportBackup,
+    importBackup,
+    
+    // Utilitários
+    showNotification,
+    saveStateToLocalStorage,
+    loadStateFromLocalStorage
+};
+
+console.log('✅ app.js carregado com sucesso');
