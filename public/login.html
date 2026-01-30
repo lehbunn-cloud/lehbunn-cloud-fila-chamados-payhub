@@ -15,7 +15,6 @@
     <link rel="stylesheet" href="style.css">
     
     <style>
-        /* (Estilos mantidos iguais) */
         .login-section {
             min-height: 100vh;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -283,7 +282,7 @@
                 this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
             });
             
-            // Processar login - CORRIGIDO
+            // Processar login
             loginForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
@@ -316,14 +315,8 @@
                     
                     console.log('✅ Login bem-sucedido, redirecionando...');
                     
-                    // Redirecionar para o painel administrativo - CORRIGIDO
-                    // Usar caminho relativo para evitar Firebase Hosting
-                    const baseUrl = window.location.href.split('/').slice(0, -1).join('/');
-                    const redirectUrl = './admin-dashboard.html';
-                    
-                    // Forçar recarregamento completo
-                    window.location.href = redirectUrl;
-                    window.location.reload();
+                    // Redirecionar para o painel administrativo
+                    window.location.href = 'admin-dashboard.html';
                     
                 } else {
                     // Login falhou
@@ -342,43 +335,12 @@
                 }
             });
             
-            // Verificar se já está autenticado
-            function checkAuthentication() {
-                const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
-                const loginTime = sessionStorage.getItem('admin_login_time');
-                
-                if (isAuthenticated && loginTime) {
-                    // Verificar se a sessão expirou (4 horas)
-                    const loginDate = new Date(loginTime);
-                    const now = new Date();
-                    const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
-                    
-                    if (hoursDiff < 4) {
-                        console.log('✅ Sessão ativa, redirecionando...');
-                        window.location.href = './admin-dashboard.html';
-                    } else {
-                        // Sessão expirada
-                        sessionStorage.removeItem('admin_authenticated');
-                        sessionStorage.removeItem('admin_username');
-                        sessionStorage.removeItem('admin_login_time');
-                        console.log('⚠️ Sessão expirada');
-                    }
-                }
-            }
-            
-            // Verificar autenticação ao carregar
-            checkAuthentication();
-            
             // Focar no campo de usuário
             document.getElementById('username').focus();
             
             // Log para debug
             console.log('🔍 Login page loaded');
             console.log('📍 Current URL:', window.location.href);
-            console.log('📁 Session storage:', {
-                authenticated: sessionStorage.getItem('admin_authenticated'),
-                username: sessionStorage.getItem('admin_username')
-            });
         });
     </script>
 </body>
