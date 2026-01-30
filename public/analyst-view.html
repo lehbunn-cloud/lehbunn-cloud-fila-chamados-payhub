@@ -3,13 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualização - Portal Payhub</title>
+    <title>Consulta - Portal Payhub</title>
+    
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Estilos -->
     <link rel="stylesheet" href="style.css">
+    
     <style>
         .view-container {
-            padding: 30px;
+            padding: 20px;
         }
         
         .analyst-grid {
@@ -112,6 +123,7 @@
             text-align: center;
             color: #6c757d;
             font-style: italic;
+            padding: 30px;
         }
         
         .ticket-number {
@@ -140,12 +152,6 @@
             color: #6c757d;
         }
         
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        
         .back-button {
             display: inline-flex;
             align-items: center;
@@ -167,7 +173,7 @@
         
         .stats-summary {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 15px;
             margin: 20px 0;
         }
@@ -178,6 +184,7 @@
             border-radius: 10px;
             text-align: center;
             border: 1px solid #e9ecef;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
         }
         
         .stat-box .number {
@@ -192,6 +199,61 @@
             color: #6c757d;
             text-transform: uppercase;
         }
+        
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            transition: all 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+        
+        .view-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .view-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #212529;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .analyst-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .view-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .refresh-btn {
+                margin-left: 0;
+                width: 100%;
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -200,41 +262,48 @@
             <div class="header-content">
                 <h1>
                     <i class="fas fa-eye"></i>
-                    Visualização dos Analistas
+                    Visualização de Status
                     <span class="version-badge">v3.5.0</span>
                 </h1>
-                <p>Visão detalhada do status e desempenho</p>
+                <p>Monitoramento em tempo real - Modo Consulta</p>
             </div>
             <a href="index.html" class="back-button">
                 <i class="fas fa-arrow-left"></i>
-                Voltar ao Painel
+                Voltar ao Início
             </a>
         </div>
         
         <div class="nav-menu">
             <a href="index.html" class="nav-link">
                 <i class="fas fa-home"></i>
-                Painel Principal
+                Página Inicial
             </a>
             <a href="analyst-view.html" class="nav-link active">
                 <i class="fas fa-eye"></i>
                 Visualização
             </a>
-            <a href="admin.html" class="nav-link">
-                <i class="fas fa-cogs"></i>
-                Administração
-            </a>
         </div>
         
         <div class="view-container">
+            <div class="view-controls">
+                <div class="view-title">
+                    <i class="fas fa-users"></i>
+                    Status dos Analistas
+                </div>
+                <button class="refresh-btn" id="refreshBtn">
+                    <i class="fas fa-sync-alt"></i>
+                    Atualizar
+                </button>
+            </div>
+            
             <div class="stats-summary">
                 <div class="stat-box">
                     <div class="number" id="totalAnalysts">0</div>
                     <div class="label">Total Analistas</div>
                 </div>
                 <div class="stat-box">
-                    <div class="number" id="activeAnalysts">0</div>
-                    <div class="label">Ativos Agora</div>
+                    <div class="number" id="availableAnalysts">0</div>
+                    <div class="label">Disponíveis</div>
                 </div>
                 <div class="stat-box">
                     <div class="number" id="busyAnalysts">0</div>
@@ -244,49 +313,145 @@
                     <div class="number" id="todayTickets">0</div>
                     <div class="label">Chamados Hoje</div>
                 </div>
+                <div class="stat-box">
+                    <div class="number" id="nextInQueue">-</div>
+                    <div class="label">Próximo na Fila</div>
+                </div>
             </div>
             
             <div class="analyst-grid" id="analystGrid">
                 <!-- Analistas serão carregados aqui -->
                 <div class="loading">
                     <div class="loading-spinner"></div>
-                    <span>Carregando analistas...</span>
+                    <span>Carregando dados dos analistas...</span>
+                </div>
+            </div>
+            
+            <!-- Fila de espera -->
+            <div class="card" style="margin-top: 30px;">
+                <div class="card-title">
+                    <i class="fas fa-clock"></i>
+                    Fila de Espera
+                    <span id="waitingCount" class="counter-badge">0 aguardando</span>
+                </div>
+                <div id="waitingQueue" class="waiting-section" style="padding: 20px;">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <span>Carregando fila de espera...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Clientes Especiais Ativos -->
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-title">
+                    <i class="fas fa-star"></i>
+                    Clientes Especiais em Atendimento
+                    <span id="specialCount" class="counter-badge">0 ativos</span>
+                </div>
+                <div id="specialClients" class="special-cases-container">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <span>Carregando clientes especiais...</span>
+                    </div>
                 </div>
             </div>
         </div>
         
         <div class="footer">
-            <p><strong>Portal de Fila de Chamados - Visualização</strong> | v3.5.0</p>
+            <p><strong>Portal Payhub - Modo Consulta</strong> | v3.5.0</p>
             <p>Última atualização: <span id="updateTime">--:--:--</span></p>
+            <p class="last-reset">Apenas visualização - Sem permissão de modificação</p>
         </div>
     </div>
     
+    <!-- Scripts -->
     <script src="firebase-config.js"></script>
     <script src="firebase-app.js"></script>
     <script>
-        // Carregar dados dos analistas
+        // Dados dos analistas (base)
+        window.analysts = [
+            { id: 1, name: "Analista 01", level: "N1", startTime: 8, endTime: 17 },
+            { id: 2, name: "Analista 02", level: "N1", startTime: 8, endTime: 17 },
+            { id: 3, name: "Analista 03", level: "N1", startTime: 8, endTime: 17 },
+            { id: 4, name: "Analista 04", level: "N2", startTime: 9, endTime: 18 },
+            { id: 5, name: "Analista 05", level: "N2", startTime: 9, endTime: 18 },
+            { id: 6, name: "Analista 06", level: "N2", startTime: 9, endTime: 18 },
+            { id: 7, name: "Analista 07", level: "N3", startTime: 10, endTime: 19 },
+            { id: 8, name: "Analista 08", level: "N3", startTime: 10, endTime: 19 },
+            { id: 9, name: "Analista 09", level: "N3", startTime: 10, endTime: 19 }
+        ];
+        
         document.addEventListener('DOMContentLoaded', function() {
             loadAnalystView();
-            setInterval(loadAnalystView, 30000); // Atualizar a cada 30 segundos
+            setupAutoRefresh();
+            
+            document.getElementById('refreshBtn').addEventListener('click', function() {
+                loadAnalystView();
+                showNotification('Dados atualizados', 'success');
+            });
         });
         
         function loadAnalystView() {
-            // Carregar estado salvo
-            const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-            const analysts = savedState.analysts || window.analysts || [];
-            
-            // Atualizar estatísticas
+            try {
+                // Carregar estado do sistema
+                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                const savedAnalysts = savedState.analysts || [];
+                const appState = savedState.appState || {};
+                
+                // Mesclar dados dos analistas com estado salvo
+                const analysts = window.analysts.map(baseAnalyst => {
+                    const savedAnalyst = savedAnalysts.find(a => a.id === baseAnalyst.id);
+                    return {
+                        ...baseAnalyst,
+                        isAvailable: savedAnalyst?.isAvailable || false,
+                        isBusy: savedAnalyst?.isBusy || false,
+                        currentTicket: savedAnalyst?.currentTicket || null,
+                        ticketStatus: savedAnalyst?.ticketStatus || null,
+                        ticketSpecialType: savedAnalyst?.ticketSpecialType || null,
+                        ticketsHandled: savedAnalyst?.ticketsHandled || 0,
+                        isWaitingForClient: savedAnalyst?.isWaitingForClient || false,
+                        lastActivity: savedAnalyst?.lastActivity || null,
+                        specialClient: savedAnalyst?.specialClient || null
+                    };
+                });
+                
+                // Atualizar estatísticas
+                updateStatistics(analysts, appState);
+                
+                // Atualizar grid de analistas
+                updateAnalystGrid(analysts);
+                
+                // Atualizar fila de espera
+                updateWaitingQueue(savedState.queueOrder || []);
+                
+                // Atualizar clientes especiais
+                updateSpecialClients(analysts);
+                
+                // Atualizar hora
+                document.getElementById('updateTime').textContent = new Date().toLocaleTimeString('pt-BR');
+                
+            } catch (error) {
+                console.error('Erro ao carregar visualização:', error);
+                showNotification('Erro ao carregar dados', 'error');
+            }
+        }
+        
+        function updateStatistics(analysts, appState) {
             const total = analysts.length;
-            const active = analysts.filter(a => a.isAvailable).length;
+            const available = analysts.filter(a => a.isAvailable && !a.isBusy).length;
             const busy = analysts.filter(a => a.isBusy).length;
-            const todayTickets = analysts.reduce((sum, a) => sum + (a.ticketsHandled || 0), 0);
+            const todayTickets = appState.ticketsToday || 0;
+            const nextInQueue = appState.nextTicketNumber || 1000;
             
             document.getElementById('totalAnalysts').textContent = total;
-            document.getElementById('activeAnalysts').textContent = active;
+            document.getElementById('availableAnalysts').textContent = available;
             document.getElementById('busyAnalysts').textContent = busy;
             document.getElementById('todayTickets').textContent = todayTickets;
-            
-            // Atualizar grid
+            document.getElementById('nextInQueue').textContent = '#' + nextInQueue;
+        }
+        
+        function updateAnalystGrid(analysts) {
             const grid = document.getElementById('analystGrid');
             if (!grid) return;
             
@@ -367,33 +532,105 @@
                         
                         ${ticketHtml}
                         
-                        <div class="action-buttons">
-                            <button class="btn btn-small" onclick="viewAnalystDetails(${analyst.id})">
-                                <i class="fas fa-chart-bar"></i> Detalhes
-                            </button>
-                            <button class="btn btn-small btn-success" onclick="assignQuickTicket(${analyst.id})">
-                                <i class="fas fa-plus"></i> Atribuir
-                            </button>
+                        <div style="margin-top: 15px; text-align: center; font-size: 12px; color: #6c757d;">
+                            <i class="fas fa-eye"></i> Modo Consulta - Sem ações disponíveis
                         </div>
                     </div>
                 `;
             });
             
             grid.innerHTML = html;
-            document.getElementById('updateTime').textContent = new Date().toLocaleTimeString('pt-BR');
         }
         
-        function viewAnalystDetails(analystId) {
-            alert(`Visualizando detalhes do analista ${analystId}`);
-            // Implementar detalhes se necessário
-        }
-        
-        function assignQuickTicket(analystId) {
-            const ticketNumber = prompt('Digite o número do ticket:');
-            if (ticketNumber && ticketNumber.trim()) {
-                // Simular atribuição
-                alert(`Ticket ${ticketNumber} atribuído ao analista ${analystId}`);
+        function updateWaitingQueue(queueOrder) {
+            const waitingContainer = document.getElementById('waitingQueue');
+            const waitingCount = document.getElementById('waitingCount');
+            
+            if (!queueOrder || queueOrder.length === 0) {
+                waitingContainer.innerHTML = '<div class="empty-state">Nenhum ticket aguardando na fila</div>';
+                waitingCount.textContent = '0 aguardando';
+                return;
             }
+            
+            waitingCount.textContent = `${queueOrder.length} aguardando`;
+            
+            let html = '<div class="waiting-list">';
+            queueOrder.forEach((ticket, index) => {
+                html += `
+                    <div class="waiting-item">
+                        <div style="font-weight: 500; color: #212529;">Ticket #${ticket.number}</div>
+                        <div style="font-size: 11px; color: #6c757d;">
+                            ${ticket.type || 'Normal'} • Posição: ${index + 1}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            waitingContainer.innerHTML = html;
+        }
+        
+        function updateSpecialClients(analysts) {
+            const specialContainer = document.getElementById('specialClients');
+            const specialCount = document.getElementById('specialCount');
+            
+            const specialAnalysts = analysts.filter(a => a.specialClient && a.isBusy);
+            
+            if (specialAnalysts.length === 0) {
+                specialContainer.innerHTML = '<div class="empty-state">Nenhum cliente especial em atendimento</div>';
+                specialCount.textContent = '0 ativos';
+                return;
+            }
+            
+            specialCount.textContent = `${specialAnalysts.length} ativos`;
+            
+            let html = '';
+            specialAnalysts.forEach(analyst => {
+                html += `
+                    <div class="special-client-card">
+                        <div class="special-client-header">
+                            <i class="fas fa-star"></i>
+                            <div>
+                                <strong>${analyst.specialClient}</strong>
+                                <small>Atendido por: ${analyst.name}</small>
+                            </div>
+                        </div>
+                        <div class="special-client-status">
+                            <div style="font-weight: 500; color: #212529;">Ticket #${analyst.currentTicket}</div>
+                            <div style="font-size: 12px; color: #6c757d;">
+                                <span class="status-indicator ${analyst.isWaitingForClient ? 'waiting' : 'busy'}"></span>
+                                ${analyst.isWaitingForClient ? 'Aguardando cliente' : 'Em atendimento'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            specialContainer.innerHTML = html;
+        }
+        
+        function setupAutoRefresh() {
+            // Atualizar a cada 30 segundos
+            setInterval(loadAnalystView, 30000);
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Criar notificação
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 
+                                  type === 'error' ? 'exclamation-circle' : 
+                                  type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remover após 3 segundos
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
         }
     </script>
 </body>
