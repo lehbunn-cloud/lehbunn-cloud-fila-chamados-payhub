@@ -165,20 +165,38 @@ class FirebaseAppIntegration {
         }
 
         try {
-            // Buscar ticket mais recente com este número
-            const ticketsRef = this.db.collection('tickets')
+            console.log(`🔍 Buscando ticket ${ticketNumber} para atualizar para: ${status}`);
+            
+            // BUSCA SIMPLIFICADA - Não usa ordem para evitar necessidade de índice
+            const ticketsRef = this.db.collection('tickets');
+            const querySnapshot = await ticketsRef
                 .where('ticketNumber', '==', ticketNumber.toString())
-                .orderBy('createdAt', 'desc')
-                .limit(1);
-
-            const querySnapshot = await ticketsRef.get();
+                .get();
             
             if (querySnapshot.empty) {
+                console.warn(`⚠️ Ticket ${ticketNumber} não encontrado`);
+                return false;
+            }
+
+            // Encontrar o ticket mais recente NÃO finalizado
+            let latestTicket = null;
+            let latestDoc = null;
+            
+            querySnapshot.forEach(doc => {
+                const data = doc.data();
+                if (data.status !== 'finalizado') {
+                    if (!latestTicket || new Date(data.createdAt) > new Date(latestTicket.createdAt)) {
+                        latestTicket = data;
+                        latestDoc = doc;
+                    }
+                }
+            });
+
+            if (!latestDoc) {
                 console.warn(`⚠️ Ticket ${ticketNumber} não encontrado para atualização`);
                 return false;
             }
 
-            const ticketDoc = querySnapshot.docs[0];
             const updateData = {
                 status: status,
                 updatedAt: new Date().toISOString()
@@ -188,12 +206,11 @@ class FirebaseAppIntegration {
                 updateData.endTime = new Date().toISOString();
                 
                 // Calcular duração
-                const ticketData = ticketDoc.data();
-                if (ticketData.startTime) {
-                    const startTime = new Date(ticketData.startTime);
+                if (latestTicket.startTime) {
+                    const startTime = new Date(latestTicket.startTime);
                     const endTime = new Date();
                     const durationMs = endTime - startTime;
-                    updateData.duration = Math.round(durationMs / 1000); // Em segundos
+                    updateData.duration = Math.round(durationMs / 1000);
                 }
             }
 
@@ -201,14 +218,135 @@ class FirebaseAppIntegration {
                 updateData.analystName = analystName;
             }
 
-            await ticketDoc.ref.update(updateData);
-            console.log(`✅ Ticket ${ticketNumber} atualizado para status: ${status}`);
+            await latestDoc.ref.update(updateData);
+            console.log(`✅ Ticket ${ticketNumber} atualizado para: ${status}`);
             return true;
             
         } catch (error) {
             console.error('❌ Erro ao atualizar ticket:', error.code, error.message);
+            
+            // Fallback: Criar novo registro se não conseguir atualizar
+            if (error.code === 'failed-precondition') {
+                console.log('🔄 Usando fallback para ticket:', ticketNumber);
+                return await this.saveTicketToFirebase(
+                    ticketNumber,
+                    analystName || 'Unknown',
+                    status,
+                    'normal'
+                ).then(id => !!id);
+            }
+            
             return false;
         }
+    }
+
+    // ============================================
+    // FUNÇÕES PARA PERSISTÊNCIA DE ESTADO
+    // ============================================
+
+    async saveAnalystsState(analystsData) {
+        if (!this.initialized || !this.db) {
+            console.warn('⚠️ Firebase não disponível para salvar estado');
+            return false;
+        }
+
+        try {
+            const batch = this.db.batch();
+            const timestamp = new Date().toISOString();
+            
+            // Limpar coleção anterior
+            const existingSnapshot = await this.db.collection('analysts_state').get();
+            existingSnapshot.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            
+            // Salvar novos dados
+            analystsData.forEach(analyst => {
+                const analystRef = this.db.collection('analysts_state').doc(`analyst_${analyst.id}`);
+                const analystData = {
+                    ...analyst,
+                    savedAt: timestamp,
+                    sessionId: this.getSessionId()
+                };
+                batch.set(analystRef, analystData);
+            });
+            
+            await batch.commit();
+            console.log(`✅ Estado de ${analystsData.length} analistas salvo no Firebase`);
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Erro ao salvar estado dos analistas:', error);
+            return false;
+        }
+    }
+
+    async loadAnalystsState() {
+        if (!this.initialized || !this.db) {
+            console.warn('⚠️ Firebase não disponível para carregar estado');
+            return null;
+        }
+
+        try {
+            const snapshot = await this.db.collection('analysts_state')
+                .orderBy('savedAt', 'desc')
+                .limit(1)
+                .get();
+            
+            if (snapshot.empty) {
+                console.log('ℹ️ Nenhum estado salvo encontrado no Firebase');
+                return null;
+            }
+            
+            const latestState = snapshot.docs[0].data();
+            console.log(`✅ Estado carregado do Firebase (salvo em: ${latestState.savedAt})`);
+            
+            return latestState;
+            
+        } catch (error) {
+            console.error('❌ Erro ao carregar estado do Firebase:', error);
+            return null;
+        }
+    }
+
+    async loadAnalystsStateFull() {
+        if (!this.initialized || !this.db) {
+            console.warn('⚠️ Firebase não disponível para carregar estado');
+            return [];
+        }
+
+        try {
+            const snapshot = await this.db.collection('analysts_state').get();
+            
+            if (snapshot.empty) {
+                console.log('ℹ️ Nenhum estado de analistas encontrado');
+                return [];
+            }
+            
+            const analystsData = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (data.id && data.name) {
+                    analystsData.push(data);
+                }
+            });
+            
+            console.log(`✅ ${analystsData.length} analistas carregados do Firebase`);
+            return analystsData;
+            
+        } catch (error) {
+            console.error('❌ Erro ao carregar estado dos analistas:', error);
+            return [];
+        }
+    }
+
+    getSessionId() {
+        let sessionId = sessionStorage.getItem('queue_session_id');
+        if (!sessionId) {
+            sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            sessionStorage.setItem('queue_session_id', sessionId);
+        }
+        return sessionId;
     }
 
     // ============================================
@@ -526,6 +664,41 @@ class FirebaseAppIntegration {
             retryCount: this.retryCount
         };
     }
+
+    // ============================================
+    // SINCRONIZAÇÃO EM TEMPO REAL
+    // ============================================
+
+    setupRealtimeSync(callback) {
+        if (!this.initialized || !this.db) {
+            console.warn('⚠️ Firebase não disponível para sincronização em tempo real');
+            return null;
+        }
+
+        try {
+            // Ouvir mudanças na coleção de estado dos analistas
+            const unsubscribe = this.db.collection('analysts_state')
+                .onSnapshot(snapshot => {
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'modified' || change.type === 'added') {
+                            const data = change.doc.data();
+                            console.log(`🔄 Estado atualizado: ${data.name}`);
+                            if (callback) {
+                                callback(data);
+                            }
+                        }
+                    });
+                }, error => {
+                    console.error('❌ Erro na sincronização em tempo real:', error);
+                });
+            
+            return unsubscribe;
+            
+        } catch (error) {
+            console.error('❌ Erro ao configurar sincronização:', error);
+            return null;
+        }
+    }
 }
 
 // ============================================
@@ -576,4 +749,42 @@ window.showFirebaseStatus = function() {
     return `🔧 Firebase Status: ${status.initialized ? '✅ Inicializado' : '❌ Não inicializado'} | Retries: ${status.retryCount}`;
 };
 
-console.log('✅ Firebase App Integration carregado');
+// Função para salvar estado dos analistas
+window.saveAnalystsState = function(analysts) {
+    if (!window.firebaseAppIntegration) {
+        console.error('❌ Firebase não disponível');
+        return false;
+    }
+    
+    const analystsData = analysts.map(analyst => ({
+        id: analyst.id,
+        name: analyst.name,
+        isAvailable: analyst.isAvailable,
+        isBusy: analyst.isBusy,
+        currentTicket: analyst.currentTicket,
+        ticketStatus: analyst.ticketStatus,
+        ticketSpecialType: analyst.ticketSpecialType,
+        ticketsHandled: analyst.ticketsHandled,
+        isWaitingForClient: analyst.isWaitingForClient,
+        inQueue: analyst.inQueue,
+        lastActivity: analyst.lastActivity,
+        specialClient: analyst.specialClient,
+        level: analyst.level,
+        startTime: analyst.startTime,
+        endTime: analyst.endTime
+    }));
+    
+    return window.firebaseAppIntegration.saveAnalystsState(analystsData);
+};
+
+// Função para carregar estado dos analistas
+window.loadAnalystsState = function() {
+    if (!window.firebaseAppIntegration) {
+        console.error('❌ Firebase não disponível');
+        return null;
+    }
+    
+    return window.firebaseAppIntegration.loadAnalystsStateFull();
+};
+
+console.log('✅ Firebase App Integration carregado (versão com persistência)');
