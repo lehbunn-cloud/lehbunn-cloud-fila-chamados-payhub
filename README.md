@@ -1,21 +1,31 @@
-# Portal de Fila de Chamados - Payhub
+# 🚀 Portal de Fila de Chamados - Payhub v3.5.0
 
-Sistema de gerenciamento de fila de atendimento para a equipe N1/N2.
+Sistema completo de gerenciamento de fila de atendimento com persistência em Firebase.
 
-## Configuração
+## 📋 Funcionalidades Principais
 
-### 1. Firebase
-1. Crie um projeto no [Firebase Console](https://console.firebase.google.com)
-2. Ative Authentication (Email/Password) e Firestore
-3. Copie as configurações para `firebase-config.js`
+### ✅ Controle de Analistas
+- Status em tempo real (Disponível, Ocupado, Aguardando, Offline)
+- Atribuição rápida de tickets
+- Clientes especiais com analistas dedicados
+- Controle por horário de trabalho
 
-### 2. Instalação
-```bash
-# Instalar Firebase CLI
-npm install -g firebase-tools
+### 🔥 Persistência Completa
+- **Firebase Firestore**: Salva todo o estado da aplicação
+- **Sincronização em tempo real**: Dados atualizados automaticamente
+- **Modo offline**: Funciona sem internet e sincrona depois
+- **Backup automático**: Salva a cada 30 segundos
 
-# Login no Firebase
-firebase login
+### 📊 Relatórios e Estatísticas
+- Geração de relatórios CSV
+- Filtro por data e tipo de cliente
+- Estatísticas em tempo real
+- Histórico completo
 
-# Inicializar projeto
-firebase init
+### 🛠️ Administração
+- Backup e restauração manual
+- Logs do sistema
+- Limpeza de cache
+- Controles avançados
+
+## 🏗️ Estrutura de Arquivos
