@@ -516,122 +516,84 @@
     <script src="firebase-config.js"></script>
     <script src="firebase-app.js"></script>
     <script>
-        // VERIFICAÇÃO DE AUTENTICAÇÃO ROBUSTA
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('=== DASHBOARD INICIALIZANDO ===');
-            
-            const authOverlay = document.getElementById('authOverlay');
-            
-            // Função de verificação robusta
-            function checkAdminAuth() {
-    console.log('🔍 Verificando autenticação...');
+  // VERIFICAÇÃO DE AUTENTICAÇÃO SIMPLES E EFETIVA
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DASHBOARD INICIALIZANDO ===');
     
-    // Verificar em sessionStorage E localStorage
-    const isAuthenticatedSession = sessionStorage.getItem('admin_authenticated') === 'true';
-    const isAuthenticatedLocal = localStorage.getItem('admin_authenticated') === 'true';
+    const authOverlay = document.getElementById('authOverlay');
     
-    const loginTimeSession = sessionStorage.getItem('admin_login_time');
-    const loginTimeLocal = localStorage.getItem('admin_login_time');
-    
-    const usernameSession = sessionStorage.getItem('admin_username');
-    const usernameLocal = localStorage.getItem('admin_username');
-    
-    console.log('Dados da sessão:', {
-        session: {
-            auth: isAuthenticatedSession,
-            user: usernameSession,
-            time: loginTimeSession
-        },
-        local: {
-            auth: isAuthenticatedLocal,
-            user: usernameLocal,
-            time: loginTimeLocal
-        }
-    });
-    
-    // Se não autenticado em nenhum, redirecionar
-    if (!isAuthenticatedSession && !isAuthenticatedLocal) {
-        console.log('❌ NÃO AUTENTICADO - Redirecionando para login');
-        // Limpar tudo
-        sessionStorage.clear();
-        localStorage.removeItem('admin_authenticated');
-        localStorage.removeItem('admin_username');
-        localStorage.removeItem('admin_login_time');
-        window.location.href = 'login.html';
-        return false;
-    }
-    
-    // Usar dados de sessionStorage primeiro, fallback para localStorage
-    const isAuthenticated = isAuthenticatedSession || isAuthenticatedLocal;
-    const loginTime = loginTimeSession || loginTimeLocal;
-    const username = usernameSession || usernameLocal;
-    
-    // Verificar se a sessão expirou (4 horas)
-    if (loginTime) {
-        try {
-            const loginDate = new Date(loginTime);
-            const now = new Date();
-            const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
-            
-            console.log(`Tempo desde login: ${hoursDiff.toFixed(2)} horas`);
-            
-            if (hoursDiff >= 4) {
-                console.log('⚠️ SESSÃO EXPIRADA - Redirecionando');
-                sessionStorage.clear();
-                localStorage.removeItem('admin_authenticated');
-                localStorage.removeItem('admin_username');
-                localStorage.removeItem('admin_login_time');
-                window.location.href = 'login.html';
-                return false;
-            }
-        } catch (error) {
-            console.error('Erro ao verificar tempo de login:', error);
-        }
-    }
-    
-    console.log('✅ SESSÃO VÁLIDA - Usuário:', username);
-    return true;
-}
-            
-            // EXECUTAR VERIFICAÇÃO IMEDIATAMENTE
-            const isAuthenticated = checkAdminAuth();
-            
-            if (!isAuthenticated) {
-                // Se não autenticado, para a execução
-                console.log('⛔ Dashboard não carregado - Usuário não autenticado');
-                return;
-            }
-            
-            // SE AUTENTICADO, CONTINUAR CARREGAMENTO
-            console.log('✅ Dashboard sendo carregado...');
-            
-            // Esconder overlay após pequeno delay
-            setTimeout(() => {
-                if (authOverlay) {
-                    authOverlay.style.display = 'none';
-                }
-                
-                // Carregar nome do admin
-                const adminUsername = sessionStorage.getItem('admin_username') || 'Administrador';
-                document.getElementById('adminUsername').textContent = adminUsername;
-                console.log('Usuário autenticado:', adminUsername);
-                
-                // Carregar dados do sistema
-                try {
-                    loadDashboard();
-                    setupEventListeners();
-                    
-                    // Atualizar a cada 10 segundos
-                    setInterval(loadDashboard, 10000);
-                    
-                    console.log('✅ Dashboard completamente carregado');
-                } catch (error) {
-                    console.error('Erro ao carregar dashboard:', error);
-                    showNotification('Erro ao carregar dados do sistema', 'error');
-                }
-                
-            }, 500);
+    // Verificação SIMPLES
+    function checkAuth() {
+        console.log('🔍 Verificando autenticação...');
+        
+        // Verificar em localStorage (principal) e sessionStorage (backup)
+        const localAuth = localStorage.getItem('admin_auth') === 'true';
+        const sessionAuth = sessionStorage.getItem('admin_auth') === 'true';
+        
+        const authTime = parseInt(localStorage.getItem('admin_time') || sessionStorage.getItem('admin_time') || '0');
+        const currentTime = Date.now();
+        const hoursDiff = (currentTime - authTime) / (1000 * 60 * 60);
+        
+        console.log('Status auth:', {
+            local: localAuth,
+            session: sessionAuth,
+            hoursDiff: hoursDiff.toFixed(2),
+            authTime: new Date(authTime).toLocaleString()
         });
+        
+        // Se não autenticado ou sessão expirou (> 8 horas)
+        if ((!localAuth && !sessionAuth) || hoursDiff > 8) {
+            console.log('❌ Não autenticado ou sessão expirada');
+            
+            // Limpar tudo
+            localStorage.removeItem('admin_auth');
+            localStorage.removeItem('admin_user');
+            localStorage.removeItem('admin_time');
+            
+            sessionStorage.removeItem('admin_auth');
+            sessionStorage.removeItem('admin_user');
+            sessionStorage.removeItem('admin_time');
+            
+            // Redirecionar para login
+            window.location.href = 'login.html';
+            return false;
+        }
+        
+        console.log('✅ Autenticado!');
+        return true;
+    }
+    
+    // EXECUTAR VERIFICAÇÃO
+    if (!checkAuth()) {
+        console.log('⛔ Dashboard não carregado - Usuário não autenticado');
+        return;
+    }
+    
+    console.log('✅ Dashboard sendo carregado...');
+    
+    // Esconder overlay
+    setTimeout(() => {
+        if (authOverlay) {
+            authOverlay.style.display = 'none';
+        }
+        
+        // Carregar nome do admin
+        const adminUser = localStorage.getItem('admin_user') || 
+                         sessionStorage.getItem('admin_user') || 
+                         'Administrador';
+        document.getElementById('adminUsername').textContent = adminUser;
+        
+        // Continuar carregamento normal
+        try {
+            loadDashboard();
+            setupEventListeners();
+            setInterval(loadDashboard, 10000);
+            console.log('✅ Dashboard completamente carregado');
+        } catch (error) {
+            console.error('Erro ao carregar dashboard:', error);
+        }
+    }, 300);
+});
         
         function loadDashboard() {
             try {
