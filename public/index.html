@@ -24,9 +24,9 @@
             <div class="header-content">
                 <h1>
                     <i class="fas fa-headset"></i>
-                    Portal de Fila de Chamados - Payhub v3.3.2
+                    Portal de Fila de Chamados - Payhub v3.4.0
                 </h1>
-                <p>Sistema otimizado com colunas de status e fluxo aprimorado</p>
+                <p>Sistema otimizado com integração Firebase</p>
             </div>
             <div class="user-info" id="userInfo">
                 <i class="fas fa-user"></i>
@@ -177,12 +177,17 @@
                     <i class="fas fa-file-csv"></i>
                     Gerar Relatório
                 </button>
+                <!-- Botão de teste Firebase -->
+                <button class="btn btn-test" id="testFirebaseBtn" style="background: #6A1B9A; color: white;">
+                    <i class="fas fa-vial"></i>
+                    Testar Firebase
+                </button>
             </div>
         </div>
         
         <!-- Rodapé -->
         <div class="footer">
-            <p><strong>Portal de Fila de Chamados - Equipe Payhub v3.3.2</strong> | Sistema com colunas de status</p>
+            <p><strong>Portal de Fila de Chamados - Equipe Payhub v3.4.0</strong> | Sistema com integração Firebase</p>
             <p>Última atualização: <span id="lastUpdate">--:--:--</span></p>
             <p class="last-reset">Fila reiniciada em: <span id="lastResetDate"></span></p>
         </div>
@@ -339,6 +344,21 @@
             if (closeLoginModalBtn) {
                 closeLoginModalBtn.addEventListener('click', function() {
                     document.getElementById('loginModal').style.display = 'none';
+                });
+            }
+            
+            // Botão de teste Firebase
+            const testFirebaseBtn = document.getElementById('testFirebaseBtn');
+            if (testFirebaseBtn) {
+                testFirebaseBtn.addEventListener('click', async function() {
+                    showNotification('Testando conexão com Firebase...', 'info');
+                    
+                    const result = await window.testFirebaseIntegration();
+                    if (result) {
+                        showNotification('✅ Firebase conectado com sucesso!', 'success');
+                    } else {
+                        showNotification('❌ Erro na conexão com Firebase', 'error');
+                    }
                 });
             }
             
