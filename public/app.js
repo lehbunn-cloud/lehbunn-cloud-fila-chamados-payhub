@@ -52,14 +52,240 @@ let appState = {
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('🚀 Inicializando Portal v3.5.0...');
     
-    // Gerar ID de sessão
-    appState.sessionId = generateSessionId();
-    sessionStorage.setItem('queue_session_id', appState.sessionId);
-    updateElementText('sessionId', appState.sessionId.substring(0, 8) + '...');
+    // Esconder loading overlay
+    const loadingOverlay = document.getElementById('loadingOverlay');
     
-    // Esconder modal de login (modo desenvolvimento)
-    hideLoginModal();
+    try {
+        // Gerar ID de sessão
+        appState.sessionId = generateSessionId();
+        sessionStorage.setItem('queue_session_id', appState.sessionId);
+        
+        // Aguardar Firebase inicializar
+        await waitForFirebase();
+        
+        // Inicializar aplicação
+        await initializeApp();
+        
+        console.log('✅ Sistema inicializado');
+        
+    } catch (error) {
+        console.error('❌ Erro crítico:', error);
+        showError('Erro ao inicializar sistema');
+    } finally {
+        // Sempre esconder loading
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'none';
+        }
+    }
+});
+
+async function waitForFirebase() {
+    return new Promise((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        const checkInterval = setInterval(() => {
+            attempts++;
+            
+            if (window.firebaseAppIntegration && 
+                (window.firebaseAppIntegration.initialized || attempts >= maxAttempts)) {
+                clearInterval(checkInterval);
+                resolve();
+            }
+            
+            if (attempts % 3 === 0) {
+                console.log(`⏳ Aguardando Firebase... (${attempts}/${maxAttempts})`);
+            }
+        }, 500);
+    });
+}
+   
+// ============================================
+// FUNÇÕES FALTANTES - ADICIONAR NO INÍCIO DO app.js
+// ============================================
+
+function updateAnalystAvailability() {
+    const now = appState.simulatedTime ? new Date(appState.simulatedTime) : new Date();
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTime = currentHour + currentMinutes / 100;
     
+    let needsRefresh = false;
+    
+    window.analysts.forEach(analyst => {
+        const newAvailability = (currentTime >= analyst.startTime && currentTime < analyst.endTime);
+        
+        if (analyst.isAvailable !== newAvailability) {
+            analyst.isAvailable = newAvailability;
+            needsRefresh = true;
+        }
+        
+        // Se saiu do horário, liberar
+        if (!analyst.isAvailable && (analyst.isBusy || analyst.currentTicket)) {
+            analyst.isBusy = false;
+            analyst.currentTicket = null;
+            analyst.ticketStatus = null;
+            analyst.ticketSpecialType = null;
+            analyst.isWaitingForClient = false;
+            analyst.inQueue = false;
+            needsRefresh = true;
+        }
+    });
+    
+    if (needsRefresh) {
+        updateQueueOrder();
+        updateStatistics();
+        updateSpecialCasesDisplay();
+        saveState();
+    }
+    
+    return needsRefresh;
+}
+
+function updateQueueOrder() {
+    const queueEligible = window.analysts.filter(a => 
+        a.level === "N1" && a.isAvailable && ((!a.isBusy && a.inQueue) || a.isWaitingForClient)
+    );
+    
+    appState.queueOrder = [...queueEligible].sort((a, b) => {
+        if (!a.isWaitingForClient && b.isWaitingForClient) return -1;
+        if (a.isWaitingForClient && !b.isWaitingForClient) return 1;
+        return a.ticketsHandled - b.ticketsHandled;
+    });
+}
+
+function updateStatistics() {
+    updateElementText('totalTickets', appState.ticketsToday);
+    updateElementText('specialTickets', appState.specialTicketsToday);
+    
+    const available = window.analysts.filter(a => a.isAvailable && !a.isBusy && !a.currentTicket).length;
+    updateElementText('availableAnalystsStat', available);
+    
+    const waiting = window.analysts.filter(a => a.isWaitingForClient).length;
+    updateElementText('waitingTickets', waiting);
+    appState.waitingTicketsToday = waiting;
+    
+    const next = appState.queueOrder.length > 0 ? appState.queueOrder[0].name : '-';
+    updateElementText('nextInQueue', next);
+    
+    updateElementText('lastResetDate', appState.lastReset);
+    
+    // Atualizar contador de analistas
+    updateElementText('analystCount', `${window.analysts.length} analistas`);
+}
+
+function updateElementText(id, text) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = text;
+}
+
+function updateLastUpdateTime() {
+    const now = new Date().toLocaleTimeString('pt-BR');
+    updateElementText('lastUpdate', now);
+}
+
+function setupAutoRefresh() {
+    // Atualizar hora a cada segundo
+    setInterval(updateCurrentTime, 1000);
+    
+    // Atualizar disponibilidade a cada minuto
+    setInterval(() => {
+        updateAnalystAvailability();
+        createAnalystStatusColumns();
+    }, 60000);
+    
+    // Atualizar estatísticas a cada 30 segundos
+    setInterval(updateStatistics, 30000);
+}
+
+function checkDailyReset() {
+    const today = new Date().toLocaleDateString('pt-BR');
+    if (today !== appState.lastReset && !appState.dailyResetDone) {
+        appState.dailyResetDone = true;
+        // Não resetar automaticamente, apenas notificar
+        console.log('ℹ️ Novo dia detectado, use "Reiniciar Dia" para limpar');
+    }
+}
+
+function focusMainInput() {
+    setTimeout(() => {
+        const input = document.getElementById('newTicketNumber');
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    }, 100);
+}
+
+function setupAutoSave() {
+    // Salvar a cada 30 segundos
+    setInterval(async () => {
+        if (window.firebaseAppIntegration?.initialized) {
+            await saveState();
+            console.log('💾 Auto-salvamento realizado');
+        }
+    }, 30000);
+}
+
+function attachCardEvents() {
+    // Botões de atribuição rápida
+    document.querySelectorAll('.assign-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const analystId = parseInt(this.getAttribute('data-id'));
+            const input = document.querySelector(`.quick-input[data-id="${analystId}"]`);
+            const ticketNumber = input?.value.trim();
+            
+            if (ticketNumber) {
+                assignTicketToAnalyst(analystId, ticketNumber, 'normal');
+                if (input) input.value = '';
+            } else {
+                showNotification('Digite o número do ticket', 'warning');
+                if (input) input.focus();
+            }
+        });
+    });
+    
+    // Inputs de atribuição rápida (Enter)
+    document.querySelectorAll('.quick-input').forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const analystId = parseInt(this.getAttribute('data-id'));
+                const ticketNumber = this.value.trim();
+                
+                if (ticketNumber) {
+                    assignTicketToAnalyst(analystId, ticketNumber, 'normal');
+                    this.value = '';
+                }
+            }
+        });
+    });
+    
+    // Botões em cards ocupados
+    document.querySelectorAll('.wait-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const analystId = parseInt(this.getAttribute('data-id'));
+            setTicketWaiting(analystId);
+        });
+    });
+    
+    document.querySelectorAll('.finish-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const analystId = parseInt(this.getAttribute('data-id'));
+            finishTicket(analystId);
+        });
+    });
+    
+    // Botões de retomar
+    document.querySelectorAll('.resume-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const analystId = parseInt(this.getAttribute('data-id'));
+            resumeTicket(analystId);
+        });
+    });
+}
+
+   
     // Inicializar aplicação
     await initializeApp();
     
