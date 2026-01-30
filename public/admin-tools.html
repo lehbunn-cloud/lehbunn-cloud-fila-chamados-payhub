@@ -370,69 +370,50 @@
     <script src="firebase-app.js"></script>
     <script>
        <script>
-        // Verificar autenticação
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('=== ADMIN TOOLS INICIALIZANDO ===');
-            
-            const authOverlay = document.getElementById('authOverlay');
-            
-            // Função de verificação
-            function checkAuthForTools() {
-                const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
-                const loginTime = sessionStorage.getItem('admin_login_time');
-                
-                console.log('Verificando autenticação para tools:', {
-                    isAuthenticated: isAuthenticated,
-                    loginTime: loginTime
-                });
-                
-                if (!isAuthenticated || !loginTime) {
-                    console.log('❌ Não autenticado para tools, redirecionando...');
-                    window.location.href = 'login.html';
-                    return false;
-                }
-                
-                // Verificar expiração
-                try {
-                    const loginDate = new Date(loginTime);
-                    const now = new Date();
-                    const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
-                    
-                    if (hoursDiff >= 4) {
-                        console.log('⚠️ Sessão expirada para tools');
-                        sessionStorage.clear();
-                        window.location.href = 'login.html';
-                        return false;
-                    }
-                } catch (error) {
-                    console.error('Erro ao verificar sessão:', error);
-                    window.location.href = 'login.html';
-                    return false;
-                }
-                
-                return true;
-            }
-            
-            // Verificar autenticação
-            if (!checkAuthForTools()) {
-                return;
-            }
-            
-            console.log('✅ Tools autenticado, carregando...');
-            
-            // Carregar nome do admin
-            const adminUsername = sessionStorage.getItem('admin_username') || 'Administrador';
-            document.getElementById('currentAdminUser').textContent = adminUsername;
-            
-            // Esconder overlay de autenticação
-            setTimeout(() => {
-                authOverlay.style.display = 'none';
-                loadSystemInfo();
-                updateLogDisplay();
-                addLog('Ferramentas administrativas carregadas', 'info');
-            }, 500);
-        });
+        // Verificar autenticação - VERSÃO SIMPLIFICADA
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== ADMIN TOOLS INICIALIZANDO ===');
+    
+    const authOverlay = document.getElementById('authOverlay');
+    
+    // Verificação SIMPLES
+    function checkAuth() {
+        console.log('🔍 Verificando autenticação para tools...');
         
+        const localAuth = localStorage.getItem('admin_auth') === 'true';
+        const sessionAuth = sessionStorage.getItem('admin_auth') === 'true';
+        
+        if (!localAuth && !sessionAuth) {
+            console.log('❌ Não autenticado, redirecionando...');
+            window.location.href = 'login.html';
+            return false;
+        }
+        
+        console.log('✅ Autenticado para tools');
+        return true;
+    }
+    
+    // Verificar autenticação
+    if (!checkAuth()) {
+        return;
+    }
+    
+    console.log('✅ Tools autenticado, carregando...');
+    
+    // Carregar nome do admin
+    const adminUsername = localStorage.getItem('admin_user') || 
+                         sessionStorage.getItem('admin_user') || 
+                         'Administrador';
+    document.getElementById('currentAdminUser').textContent = adminUsername;
+    
+    // Esconder overlay e continuar
+    setTimeout(() => {
+        authOverlay.style.display = 'none';
+        loadSystemInfo();
+        updateLogDisplay();
+        addLog('Ferramentas administrativas carregadas', 'info');
+    }, 300);
+});
         // Logs do sistema
         const systemLogs = [];
         
