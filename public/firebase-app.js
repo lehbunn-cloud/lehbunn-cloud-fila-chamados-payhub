@@ -7,51 +7,114 @@ class FirebaseAppIntegration {
         this.db = null;
         this.auth = null;
         this.initialized = false;
+        this.retryCount = 0;
+        this.maxRetries = 3;
         this.init();
     }
 
     async init() {
         try {
-            if (!window.firebaseApp) {
-                console.warn('⚠️ Firebase não inicializado. Tentando inicializar...');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                if (!window.firebaseApp) {
-                    console.error('❌ Firebase não disponível');
-                    return;
-                }
+            console.log('🔧 Inicializando Firebase App Integration...');
+            
+            // Aguardar um pouco para garantir que firebase-config.js foi carregado
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Verificar se firebaseConfig está disponível
+            if (!window.firebaseConfig) {
+                console.warn('⚠️ window.firebaseConfig não encontrado. Aguardando...');
+                await this.waitForFirebaseConfig();
             }
-
+            
+            // Obter referências do Firebase
             const refs = window.firebaseConfig?.getFirebaseRefs();
             if (!refs || !refs.db) {
                 console.error('❌ Referências do Firebase não disponíveis');
+                await this.retryInitialization();
                 return;
             }
 
             this.db = refs.db;
             this.auth = refs.auth;
             this.initialized = true;
+            this.retryCount = 0;
             
             console.log('✅ Firebase App Integration inicializado');
             
-            // Testar conexão
-            await this.testConnection();
+            // Testar conexão em segundo plano
+            setTimeout(() => this.testConnection(), 1000);
+            
+            // Sincronizar tickets offline se houver
+            setTimeout(() => this.syncOfflineTickets(), 2000);
             
         } catch (error) {
             console.error('❌ Erro ao inicializar Firebase App Integration:', error);
+            await this.retryInitialization();
+        }
+    }
+
+    async waitForFirebaseConfig() {
+        return new Promise((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            const checkInterval = setInterval(() => {
+                attempts++;
+                
+                if (window.firebaseConfig) {
+                    clearInterval(checkInterval);
+                    console.log('✅ firebaseConfig carregado após', attempts, 'tentativas');
+                    resolve();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    console.error('❌ Timeout aguardando firebaseConfig');
+                    reject(new Error('Firebase config não carregado'));
+                }
+            }, 300);
+        });
+    }
+
+    async retryInitialization() {
+        if (this.retryCount >= this.maxRetries) {
+            console.error('❌ Máximo de tentativas de inicialização excedido');
+            this.setupOfflineMode();
+            return;
+        }
+        
+        this.retryCount++;
+        console.log(`🔄 Tentativa ${this.retryCount}/${this.maxRetries} de inicialização...`);
+        
+        await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount));
+        await this.init();
+    }
+
+    setupOfflineMode() {
+        console.warn('⚠️ Configurando modo offline');
+        this.initialized = false;
+        
+        // Mostrar notificação de modo offline
+        if (typeof showNotification === 'function') {
+            setTimeout(() => {
+                showNotification('Sistema operando em modo offline', 'warning');
+            }, 1000);
         }
     }
 
     async testConnection() {
+        if (!this.initialized || !this.db) {
+            console.warn('⚠️ Firebase não disponível para teste de conexão');
+            return;
+        }
+
         try {
             const testRef = this.db.collection('_test').doc('connection');
             await testRef.set({
                 test: true,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                app: 'Payhub Queue Portal'
             });
             console.log('✅ Conexão com Firebase testada com sucesso');
         } catch (error) {
-            console.error('❌ Erro ao testar conexão Firebase:', error);
+            console.error('❌ Erro ao testar conexão Firebase:', error.code, error.message);
         }
     }
 
@@ -89,7 +152,7 @@ class FirebaseAppIntegration {
             return ticketId;
             
         } catch (error) {
-            console.error('❌ Erro ao salvar ticket no Firebase:', error);
+            console.error('❌ Erro ao salvar ticket no Firebase:', error.code, error.message);
             this.saveToLocalStorage(ticketNumber, analystName, status, clientType);
             return null;
         }
@@ -105,7 +168,6 @@ class FirebaseAppIntegration {
             // Buscar ticket mais recente com este número
             const ticketsRef = this.db.collection('tickets')
                 .where('ticketNumber', '==', ticketNumber.toString())
-                .where('status', '!=', 'finalizado')
                 .orderBy('createdAt', 'desc')
                 .limit(1);
 
@@ -144,7 +206,7 @@ class FirebaseAppIntegration {
             return true;
             
         } catch (error) {
-            console.error('❌ Erro ao atualizar ticket:', error);
+            console.error('❌ Erro ao atualizar ticket:', error.code, error.message);
             return false;
         }
     }
@@ -160,9 +222,14 @@ class FirebaseAppIntegration {
         }
 
         try {
+            // Converter strings de data para objetos Date
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999); // Fim do dia
+            
             let query = this.db.collection('tickets')
-                .where('createdAt', '>=', startDate)
-                .where('createdAt', '<=', endDate);
+                .where('createdAt', '>=', start.toISOString())
+                .where('createdAt', '<=', end.toISOString());
 
             // Se não for para incluir todos, filtrar apenas especiais
             if (!includeAll) {
@@ -184,7 +251,7 @@ class FirebaseAppIntegration {
             return tickets;
             
         } catch (error) {
-            console.error('❌ Erro ao buscar tickets:', error);
+            console.error('❌ Erro ao buscar tickets:', error.code, error.message);
             return [];
         }
     }
@@ -198,14 +265,14 @@ class FirebaseAppIntegration {
 
         // Cabeçalho do CSV
         const headers = [
-            'Ticket Number',
-            'Analyst',
+            'Número do Ticket',
+            'Analista',
             'Status',
-            'Client Type',
-            'Start Time',
-            'End Time',
-            'Duration (seconds)',
-            'Created At'
+            'Tipo de Cliente',
+            'Horário Início',
+            'Horário Fim',
+            'Duração (segundos)',
+            'Data Criação'
         ];
 
         // Converter dados para CSV
@@ -235,8 +302,12 @@ class FirebaseAppIntegration {
 
     formatDateForCSV(dateString) {
         if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toLocaleString('pt-BR');
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleString('pt-BR');
+        } catch (error) {
+            return dateString;
+        }
     }
 
     downloadCSV(csvString, filename = 'relatorio_chamados.csv') {
@@ -246,17 +317,21 @@ class FirebaseAppIntegration {
         }
 
         try {
-            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            // Adicionar BOM para UTF-8
+            const BOM = '\uFEFF';
+            const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
             
-            link.setAttribute('href', url);
-            link.setAttribute('download', filename);
-            link.style.visibility = 'hidden';
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.style.display = 'none';
             
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            
+            // Liberar memória
+            setTimeout(() => URL.revokeObjectURL(link.href), 100);
             
             console.log(`✅ Relatório CSV gerado: ${filename}`);
             return true;
@@ -283,6 +358,11 @@ class FirebaseAppIntegration {
                 synced: false
             });
             
+            // Manter apenas os últimos 100 tickets offline
+            if (tickets.length > 100) {
+                tickets.splice(0, tickets.length - 100);
+            }
+            
             localStorage.setItem('offlineTickets', JSON.stringify(tickets));
             console.log(`📱 Ticket ${ticketNumber} salvo localmente (aguardando sincronização)`);
         } catch (error) {
@@ -300,13 +380,18 @@ class FirebaseAppIntegration {
             console.log(`🔄 Sincronizando ${pendingTickets.length} tickets offline...`);
             
             for (const ticket of pendingTickets) {
-                await this.saveTicketToFirebase(
-                    ticket.ticketNumber,
-                    ticket.analystName,
-                    ticket.status,
-                    ticket.clientType
-                );
-                ticket.synced = true;
+                try {
+                    await this.saveTicketToFirebase(
+                        ticket.ticketNumber,
+                        ticket.analystName,
+                        ticket.status,
+                        ticket.clientType
+                    );
+                    ticket.synced = true;
+                } catch (error) {
+                    console.error(`❌ Erro ao sincronizar ticket ${ticket.ticketNumber}:`, error);
+                    // Continua com os próximos tickets
+                }
             }
             
             localStorage.setItem('offlineTickets', JSON.stringify(offlineTickets));
@@ -424,13 +509,30 @@ class FirebaseAppIntegration {
             return null;
         }
     }
+
+    // ============================================
+    // FUNÇÕES DE UTILIDADE
+    // ============================================
+
+    isInitialized() {
+        return this.initialized;
+    }
+
+    getStatus() {
+        return {
+            initialized: this.initialized,
+            db: !!this.db,
+            auth: !!this.auth,
+            retryCount: this.retryCount
+        };
+    }
 }
 
 // ============================================
 // INICIALIZAÇÃO E EXPORTAÇÃO
 // ============================================
 
-// Criar instância global
+// Criar instância global imediatamente
 window.firebaseAppIntegration = new FirebaseAppIntegration();
 
 // Adicionar função global para testar
@@ -462,6 +564,16 @@ window.testFirebaseIntegration = async function() {
         console.error('❌ Erro no teste:', error);
         return false;
     }
+};
+
+// Função para exibir status do Firebase
+window.showFirebaseStatus = function() {
+    if (!window.firebaseAppIntegration) {
+        return '❌ Firebase App Integration não carregado';
+    }
+    
+    const status = window.firebaseAppIntegration.getStatus();
+    return `🔧 Firebase Status: ${status.initialized ? '✅ Inicializado' : '❌ Não inicializado'} | Retries: ${status.retryCount}`;
 };
 
 console.log('✅ Firebase App Integration carregado');
