@@ -40,6 +40,17 @@ function logInitialization(env) {
   }
 }
 
+// Verificar se já foi inicializado
+function isAlreadyInitialized() {
+  if (typeof firebase === 'undefined') return false;
+  
+  try {
+    return firebase.apps.length > 0;
+  } catch (error) {
+    return false;
+  }
+}
+
 // Modificar a função initializeFirebaseApp:
 function initializeFirebaseApp() {
   // Verificar se Firebase SDK foi carregado
@@ -48,33 +59,29 @@ function initializeFirebaseApp() {
     return null;
   }
   
+  // Verificar se já foi inicializado
+  if (isAlreadyInitialized()) {
+    console.log('✅ Firebase já foi inicializado anteriormente, reusando...');
+    const app = firebase.app();
+    return {
+      app: app,
+      db: firebase.firestore(app),
+      auth: firebase.auth(app),
+      firebase: firebase,
+      config: FIREBASE_CONFIG,
+      environment: APP_ENV,
+      isMock: false,
+      isReused: true
+    };
+  }
+  
   try {
     // Inicializar Firebase App
-    let app;
+    const app = firebase.initializeApp(FIREBASE_CONFIG);
+    console.log('✅ Firebase inicializado com sucesso');
     
-    if (firebase.apps.length > 0) {
-      app = firebase.app();
-      console.log('✅ Firebase já inicializado');
-    } else {
-      app = firebase.initializeApp(FIREBASE_CONFIG);
-      console.log('✅ Firebase inicializado com sucesso');
-    }
-    
-    // Configurar Firestore COM PERSISTÊNCIA PRIMEIRO
+    // Configurar Firestore
     const db = firebase.firestore(app);
-    
-    // HABILITAR PERSISTÊNCIA ANTES DE QUALQUER OUTRA OPERAÇÃO
-    db.enablePersistence()
-      .then(() => {
-        console.log('✅ Persistência offline ativada');
-      })
-      .catch((err) => {
-        if (err.code === 'failed-precondition') {
-          console.warn('⚠️ Múltiplas abas abertas - Persistência limitada');
-        } else if (err.code === 'unimplemented') {
-          console.warn('⚠️ Persistência não suportada pelo navegador');
-        }
-      });
     
     // Configurações para desenvolvimento
     if (APP_ENV === 'development') {
@@ -86,6 +93,27 @@ function initializeFirebaseApp() {
     // Configurar Auth
     const auth = firebase.auth(app);
     
+    // TENTAR ativar persistência (mas não bloquear se falhar)
+    setTimeout(() => {
+      try {
+        db.enablePersistence()
+          .then(() => {
+            console.log('✅ Persistência offline ativada');
+          })
+          .catch((err) => {
+            if (err.code === 'failed-precondition') {
+              console.warn('⚠️ Múltiplas abas abertas - Persistência limitada');
+            } else if (err.code === 'unimplemented') {
+              console.warn('⚠️ Persistência não suportada pelo navegador');
+            } else {
+              console.warn('⚠️ Persistência não pôde ser ativada:', err.message);
+            }
+          });
+      } catch (error) {
+        console.warn('⚠️ Não foi possível ativar persistência:', error.message);
+      }
+    }, 1000);
+    
     return {
       app: app,
       db: db,
@@ -93,7 +121,8 @@ function initializeFirebaseApp() {
       firebase: firebase,
       config: FIREBASE_CONFIG,
       environment: APP_ENV,
-      isMock: false
+      isMock: false,
+      isReused: false
     };
     
   } catch (error) {
@@ -108,6 +137,7 @@ function initializeFirebaseApp() {
     return null;
   }
 }
+
 // Mock para desenvolvimento offline
 function createFirebaseMock() {
   console.warn('⚠️ Usando MOCK do Firebase - Dados apenas locais');
@@ -145,7 +175,8 @@ function createFirebaseMock() {
     firebase: null,
     config: FIREBASE_CONFIG,
     environment: 'mock',
-    isMock: true
+    isMock: true,
+    isReused: false
   };
 }
 
@@ -158,18 +189,20 @@ function setupConnectionMonitoring(firebaseApp) {
     const connectionRef = firebaseApp.db.collection('_connections').doc('monitor');
     
     // Testar conexão inicial
-    connectionRef.set({
-      lastCheck: new Date().toISOString(),
-      status: 'online'
-    }, { merge: true })
-      .then(() => {
-        console.log('✅ Rede habilitada');
-        updateConnectionStatus(true);
-      })
-      .catch((error) => {
-        console.error('❌ Erro ao testar conexão:', error);
-        updateConnectionStatus(false);
-      });
+    setTimeout(() => {
+      connectionRef.set({
+        lastCheck: new Date().toISOString(),
+        status: 'online'
+      }, { merge: true })
+        .then(() => {
+          console.log('✅ Rede habilitada');
+          updateConnectionStatus(true);
+        })
+        .catch((error) => {
+          console.error('❌ Erro ao testar conexão:', error);
+          updateConnectionStatus(false);
+        });
+    }, 2000);
     
     // Verificar conexão periodicamente de forma mais simples
     setInterval(() => {
@@ -213,15 +246,9 @@ document.addEventListener('DOMContentLoaded', function() {
   if (firebaseApp && !firebaseApp.isMock) {
     setupConnectionMonitoring(firebaseApp);
     
-    firebaseApp.db.enablePersistence()
-      .then(() => console.log('✅ Persistência offline ativada'))
-      .catch(err => {
-        if (err.code === 'failed-precondition') {
-          console.warn('⚠️ Múltiplas abas abertas');
-        } else if (err.code === 'unimplemented') {
-          console.warn('⚠️ Persistência não suportada');
-        }
-      });
+    if (firebaseApp.isReused) {
+      console.log('ℹ️ Firebase reutilizado de inicialização anterior');
+    }
   } else if (firebaseApp?.isMock) {
     const statusElement = document.getElementById('firebaseStatus');
     if (statusElement) {
