@@ -2,13 +2,13 @@
 // PORTAL DE FILA DE CHAMADOS - PAYHUB
 // ============================================
 // app.js - Lógica principal da aplicação
-// Versão: 3.3.2
+// Versão: 3.4.0
 // Data: 2024
-// ATUALIZAÇÃO: Sistema unificado com colunas de status e lógica de retorno à fila
+// ATUALIZAÇÃO: Integração completa com Firebase
 // CORREÇÕES: 
-// 1. Corrigido problema do cursor sumindo
-// 2. Corrigido analistas não aparecendo na coluna "Em Atendimento"
-// 3. Todos os controles habilitados
+// 1. Integração com Firebase para persistência de dados
+// 2. Geração de relatórios CSV
+// 3. Sincronização offline
 
 // ============================================
 // CONFIGURAÇÃO GLOBAL
@@ -195,7 +195,8 @@ let appState = {
     focusedInputId: null,
     manualAssignments: [],
     userLoggedIn: false,
-    activeInputs: {} // Para rastrear inputs ativos
+    activeInputs: {}, // Para rastrear inputs ativos
+    firebaseStatus: 'checking' // checking, connected, disconnected
 };
 
 // Cache para melhor performance
@@ -211,7 +212,8 @@ let cache = {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Inicializando Portal de Fila Payhub v3.3.2...');
+    console.log('🚀 Inicializando Portal de Fila Payhub v3.4.0...');
+    console.log('🔥 Integração Firebase ativada');
     
     // Primeiro: remover o modal de login (temporário para testes)
     const loginModal = document.getElementById('loginModal');
@@ -226,6 +228,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setupAutoRefresh();
     setupEventListeners();
     checkSavedState();
+    
+    // Inicializar status do Firebase
+    updateFirebaseStatus();
 });
 
 function initializeApp() {
@@ -248,7 +253,7 @@ function initializeApp() {
         
         appState.isInitialized = true;
         
-        console.log('✅ Aplicação v3.3.2 inicializada com sucesso');
+        console.log('✅ Aplicação v3.4.0 inicializada com sucesso');
         
         // Focar no input principal
         setTimeout(() => {
@@ -261,13 +266,58 @@ function initializeApp() {
         
         // Mostrar notificação de inicialização
         setTimeout(() => {
-            showNotification('Sistema de fila v3.3.2 carregado', 'success');
+            showNotification('Sistema de fila v3.4.0 carregado', 'success');
+            
+            // Verificar status do Firebase
+            if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+                showNotification('Firebase conectado com sucesso', 'success');
+                appState.firebaseStatus = 'connected';
+            } else {
+                showNotification('Modo offline ativado', 'warning');
+                appState.firebaseStatus = 'disconnected';
+            }
         }, 1000);
         
     } catch (error) {
         console.error('❌ Erro na inicialização:', error);
         showError('Falha na inicialização do sistema');
     }
+}
+
+function updateFirebaseStatus() {
+    if (!window.firebaseAppIntegration) {
+        appState.firebaseStatus = 'disconnected';
+        return;
+    }
+    
+    const status = window.firebaseAppIntegration.getStatus();
+    if (status.initialized) {
+        appState.firebaseStatus = 'connected';
+    } else {
+        appState.firebaseStatus = 'disconnected';
+    }
+}
+
+// ============================================
+// FUNÇÕES DE INTEGRAÇÃO COM FIREBASE
+// ============================================
+
+function saveTicketToFirebase(ticketNumber, analystName, status, clientType) {
+    if (!window.firebaseAppIntegration || !window.firebaseAppIntegration.saveTicketToFirebase) {
+        console.warn('⚠️ Função saveTicketToFirebase não disponível');
+        return null;
+    }
+    
+    return window.firebaseAppIntegration.saveTicketToFirebase(ticketNumber, analystName, status, clientType);
+}
+
+function updateTicketStatusInFirebase(ticketNumber, status, analystName) {
+    if (!window.firebaseAppIntegration || !window.firebaseAppIntegration.updateTicketStatus) {
+        console.warn('⚠️ Função updateTicketStatus não disponível');
+        return false;
+    }
+    
+    return window.firebaseAppIntegration.updateTicketStatus(ticketNumber, status, analystName);
 }
 
 // ============================================
@@ -423,6 +473,25 @@ function createAnalystStatusColumns() {
             </div>
         </div>
     `;
+    
+    // Adicionar status do Firebase
+    if (appState.firebaseStatus === 'connected') {
+        html += `
+            <div style="margin-top: 15px; text-align: right;">
+                <span style="font-size: 11px; color: #4CAF50;">
+                    <i class="fas fa-plug"></i> Firebase Conectado
+                </span>
+            </div>
+        `;
+    } else if (appState.firebaseStatus === 'disconnected') {
+        html += `
+            <div style="margin-top: 15px; text-align: right;">
+                <span style="font-size: 11px; color: #f44336;">
+                    <i class="fas fa-unlink"></i> Modo Offline
+                </span>
+            </div>
+        `;
+    }
     
     // Atualizar o container
     container.innerHTML = html;
@@ -845,8 +914,15 @@ function assignTicketToAnalyst(analystId, ticketNumber, ticketType, ticketStatus
     createAnalystStatusColumns(); // Recriar colunas para refletir mudança
     
     // Salvar no Firebase se disponível
-    if (window.firebaseAppIntegration?.saveTicketToFirebase) {
-        window.firebaseAppIntegration.saveTicketToFirebase(ticketNumber, analyst.name, ticketStatus === 'atendendo' ? 'iniciado' : 'aguardando');
+    const firebaseStatus = saveTicketToFirebase(
+        ticketNumber, 
+        analyst.name, 
+        'iniciado', 
+        ticketType === 'normal' ? 'normal' : ticketType
+    );
+    
+    if (firebaseStatus) {
+        console.log(`✅ Ticket ${ticketNumber} salvo no Firebase`);
     }
     
     // Salvar localmente
@@ -865,9 +941,9 @@ function finishTicket(analystId) {
     const ticketNumber = analyst.currentTicket;
     const wasSpecialClient = analyst.ticketSpecialType;
     
-    // Salvar histórico antes de limpar
-    if (ticketNumber && window.firebaseAppIntegration?.saveTicketToFirebase) {
-        window.firebaseAppIntegration.saveTicketToFirebase(ticketNumber, analyst.name, 'finalizado');
+    // Salvar histórico no Firebase
+    if (ticketNumber) {
+        updateTicketStatusInFirebase(ticketNumber, 'finalizado', analyst.name);
     }
     
     // Finalizar o chamado
@@ -898,6 +974,11 @@ function setTicketWaiting(analystId) {
     
     if (!analyst) return;
     
+    // Salvar no Firebase
+    if (analyst.currentTicket) {
+        updateTicketStatusInFirebase(analyst.currentTicket, 'aguardando', analyst.name);
+    }
+    
     // Colocar em estado de espera
     analyst.ticketStatus = 'aguardando-cliente';
     analyst.isBusy = false;
@@ -923,6 +1004,11 @@ function resumeTicket(analystId) {
     const analyst = window.analysts.find(a => a.id === analystId);
     
     if (!analyst) return;
+    
+    // Salvar no Firebase
+    if (analyst.currentTicket) {
+        updateTicketStatusInFirebase(analyst.currentTicket, 'iniciado', analyst.name);
+    }
     
     // Retomar atendimento
     analyst.ticketStatus = 'atendendo';
@@ -1455,6 +1541,11 @@ function freeAllAnalysts() {
     
     window.analysts.forEach(analyst => {
         if (analyst.isBusy || analyst.currentTicket) {
+            // Salvar no Firebase se houver ticket
+            if (analyst.currentTicket) {
+                updateTicketStatusInFirebase(analyst.currentTicket, 'finalizado', analyst.name);
+            }
+            
             analyst.isBusy = false;
             analyst.currentTicket = null;
             analyst.ticketStatus = null;
@@ -1532,6 +1623,21 @@ function returnToRealTime() {
 function openReportModal() {
     saveActiveInputsState();
     document.getElementById('reportModal').style.display = 'flex';
+    
+    // Preencher datas padrão (últimos 7 dias)
+    const today = new Date();
+    const lastWeek = new Date();
+    lastWeek.setDate(today.getDate() - 7);
+    
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    
+    if (startDateInput) {
+        startDateInput.value = lastWeek.toISOString().split('T')[0];
+    }
+    if (endDateInput) {
+        endDateInput.value = today.toISOString().split('T')[0];
+    }
 }
 
 function closeReportModal() {
@@ -1654,25 +1760,66 @@ function loadStateFromLocalStorage() {
 }
 
 // ============================================
-// FUNÇÕES DE RELATÓRIOS
+// FUNÇÕES DE RELATÓRIOS - COMPLETA INTEGRAÇÃO
 // ============================================
 
 async function generateCSVReport() {
-    if (!window.firebaseAppIntegration || !window.firebaseAppIntegration.getTicketsByDateRange) {
-        showNotification('Funcionalidade de relatórios não disponível', 'error');
-        return;
-    }
-    
     const startDate = document.getElementById('startDate')?.value;
     const endDate = document.getElementById('endDate')?.value;
+    const includeAll = document.getElementById('includeAllTickets')?.checked || false;
     
     if (!startDate || !endDate) {
         showNotification('Selecione as datas inicial e final', 'warning');
         return;
     }
     
-    // Implementação do relatório...
-    showNotification('Gerando relatório...', 'info');
+    // Verificar se as datas são válidas
+    if (new Date(startDate) > new Date(endDate)) {
+        showNotification('Data inicial não pode ser maior que data final', 'error');
+        return;
+    }
+    
+    try {
+        showNotification('Gerando relatório CSV...', 'info');
+        
+        // Verificar se Firebase está disponível
+        if (!window.firebaseAppIntegration || !window.firebaseAppIntegration.isInitialized()) {
+            showNotification('Firebase não disponível. Verifique a conexão.', 'error');
+            return;
+        }
+        
+        // Gerar relatório CSV
+        const csvContent = await window.firebaseAppIntegration.generateCSVReport(
+            startDate,
+            endDate,
+            includeAll
+        );
+        
+        if (!csvContent) {
+            showNotification('Nenhum dado encontrado para o período selecionado', 'warning');
+            return;
+        }
+        
+        // Criar nome do arquivo
+        const startFormatted = startDate.replace(/-/g, '');
+        const endFormatted = endDate.replace(/-/g, '');
+        const filename = `relatorio_chamados_${startFormatted}_${endFormatted}.csv`;
+        
+        // Baixar arquivo
+        const success = window.firebaseAppIntegration.downloadCSV(csvContent, filename);
+        
+        if (success) {
+            showNotification(`Relatório ${filename} gerado com sucesso`, 'success');
+        } else {
+            showNotification('Erro ao gerar relatório', 'error');
+        }
+        
+        closeReportModal();
+        
+    } catch (error) {
+        console.error('❌ Erro ao gerar relatório:', error);
+        showNotification('Erro ao gerar relatório: ' + error.message, 'error');
+    }
 }
 
 // ============================================
@@ -1733,8 +1880,13 @@ window.appController = {
     
     showNotification,
     saveStateToLocalStorage,
-    loadStateFromLocalStorage
+    loadStateFromLocalStorage,
+    
+    // Novas funções Firebase
+    saveTicketToFirebase,
+    updateTicketStatusInFirebase,
+    generateCSVReport
 };
 
-console.log('✅ app.js v3.3.2 carregado com sucesso');
-console.log('📋 Sistema corrigido: analistas agora aparecem na coluna "Em Atendimento"');
+console.log('✅ app.js v3.4.0 carregado com sucesso');
+console.log('🔥 Integração Firebase ativada');
