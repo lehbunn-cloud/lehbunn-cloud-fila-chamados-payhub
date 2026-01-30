@@ -260,99 +260,143 @@
     
     <!-- Scripts -->
     <script>
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== DEBUG LOGIN ===');
-    console.log('URL:', window.location.href);
-    
-    const loginForm = document.getElementById('loginForm');
-    const loginBtn = document.getElementById('loginBtn');
-    const loadingSpinner = document.getElementById('loadingSpinner');
-    const loginError = document.getElementById('loginError');
-    const errorText = document.getElementById('errorText');
-    const togglePassword = document.getElementById('togglePassword');
-    const passwordInput = document.getElementById('password');
-    
-    // Credenciais de administrador
-    const ADMIN_CREDENTIALS = {
-        username: 'admin',
-        password: 'admin123'
-    };
-    
-    // Alternar visibilidade da senha
-    togglePassword.addEventListener('click', function() {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
-    });
-    
-    // Processar login - VERSÃO DEBUG
-    loginForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const username = document.getElementById('username').value.trim();
-        const password = document.getElementById('password').value;
-        
-        console.log('Tentando login com:', { username, password });
-        
-        if (!username || !password) {
-            errorText.textContent = 'Preencha todos os campos';
-            loginError.classList.add('show');
-            return;
-        }
-        
-        // Mostrar loading
-        loginBtn.disabled = true;
-        loadingSpinner.style.display = 'block';
-        loginBtn.querySelector('span').textContent = 'Autenticando...';
-        loginError.classList.remove('show');
-        
-        // Verificar credenciais com delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Verificar credenciais
-        if (username === ADMIN_CREDENTIALS.username && 
-            password === ADMIN_CREDENTIALS.password) {
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== LOGIN PAGE LOADED ===');
             
-            // Login bem-sucedido
-            sessionStorage.setItem('admin_authenticated', 'true');
-            sessionStorage.setItem('admin_username', username);
-            sessionStorage.setItem('admin_login_time', new Date().toISOString());
+            const loginForm = document.getElementById('loginForm');
+            const loginBtn = document.getElementById('loginBtn');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const loginError = document.getElementById('loginError');
+            const errorText = document.getElementById('errorText');
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
             
-            console.log('✅ CREDENCIAIS CORRETAS');
-            console.log('sessionStorage configurado:', {
-                authenticated: sessionStorage.getItem('admin_authenticated'),
-                username: sessionStorage.getItem('admin_username'),
-                loginTime: sessionStorage.getItem('admin_login_time')
+            // Credenciais de administrador
+            const ADMIN_CREDENTIALS = {
+                username: 'admin',
+                password: 'admin123'
+            };
+            
+            // Alternar visibilidade da senha
+            togglePassword.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
             });
             
-            // Tentar acesso direto primeiro
-            console.log('🔗 Tentando acessar dashboard...');
+            // Processar login - VERSÃO ROBUSTA
+            loginForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                
+                console.log('Tentando login com:', { username: username });
+                
+                if (!username || !password) {
+                    errorText.textContent = 'Preencha todos os campos';
+                    loginError.classList.add('show');
+                    return;
+                }
+                
+                // Mostrar loading
+                loginBtn.disabled = true;
+                loadingSpinner.style.display = 'block';
+                loginBtn.querySelector('span').textContent = 'Autenticando...';
+                loginError.classList.remove('show');
+                
+                // Verificar credenciais com delay
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                // Verificar credenciais
+                if (username === ADMIN_CREDENTIALS.username && 
+                    password === ADMIN_CREDENTIALS.password) {
+                    
+                    console.log('✅ CREDENCIAIS CORRETAS');
+                    
+                    // Login bem-sucedido
+                    sessionStorage.setItem('admin_authenticated', 'true');
+                    sessionStorage.setItem('admin_username', username);
+                    sessionStorage.setItem('admin_login_time', new Date().toISOString());
+                    
+                    console.log('sessionStorage configurado:', {
+                        authenticated: sessionStorage.getItem('admin_authenticated'),
+                        username: sessionStorage.getItem('admin_username'),
+                        loginTime: sessionStorage.getItem('admin_login_time')
+                    });
+                    
+                    // Forçar atualização antes do redirecionamento
+                    sessionStorage.setItem('auth_redirect', 'true');
+                    
+                    // Redirecionar para o painel administrativo
+                    console.log('🔗 Redirecionando para admin-dashboard.html...');
+                    
+                    // Usar replace para evitar histórico
+                    window.location.replace('admin-dashboard.html');
+                    
+                    // Fallback se replace falhar
+                    setTimeout(() => {
+                        if (window.location.href.indexOf('admin-dashboard') === -1) {
+                            window.location.href = 'admin-dashboard.html';
+                        }
+                    }, 1000);
+                    
+                } else {
+                    // Login falhou
+                    console.log('❌ CREDENCIAIS INCORRETAS');
+                    errorText.textContent = 'Usuário ou senha incorretos';
+                    loginError.classList.add('show');
+                    
+                    // Resetar botão
+                    loginBtn.disabled = false;
+                    loadingSpinner.style.display = 'none';
+                    loginBtn.querySelector('span').textContent = 'Entrar';
+                    
+                    // Limpar campos
+                    document.getElementById('password').value = '';
+                    document.getElementById('username').focus();
+                    document.getElementById('username').select();
+                }
+            });
             
-            // Forçar redirecionamento
-            window.location.href = 'admin-dashboard.html';
-            window.location.replace('admin-dashboard.html');
+            // Verificar se já está autenticado
+            function checkIfAlreadyAuthenticated() {
+                const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+                const loginTime = sessionStorage.getItem('admin_login_time');
+                
+                if (isAuthenticated && loginTime) {
+                    // Verificar se a sessão expirou (4 horas)
+                    const loginDate = new Date(loginTime);
+                    const now = new Date();
+                    const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
+                    
+                    if (hoursDiff < 4) {
+                        console.log('⚠️ Já autenticado, redirecionando...');
+                        window.location.replace('admin-dashboard.html');
+                    } else {
+                        // Sessão expirada
+                        console.log('⚠️ Sessão expirada, limpando...');
+                        sessionStorage.removeItem('admin_authenticated');
+                        sessionStorage.removeItem('admin_username');
+                        sessionStorage.removeItem('admin_login_time');
+                    }
+                }
+            }
             
-        } else {
-            // Login falhou
-            console.log('❌ CREDENCIAIS INCORRETAS');
-            errorText.textContent = 'Usuário ou senha incorretos';
-            loginError.classList.add('show');
-            
-            // Resetar botão
-            loginBtn.disabled = false;
-            loadingSpinner.style.display = 'none';
-            loginBtn.querySelector('span').textContent = 'Entrar';
-            
-            // Limpar campos
-            document.getElementById('password').value = '';
+            // Focar no campo de usuário
             document.getElementById('username').focus();
-            document.getElementById('username').select();
-        }
-    });
-    
-    // Focar no campo de usuário
-    document.getElementById('username').focus();
-});
-</script>
+            
+            // Log para debug
+            console.log('URL atual:', window.location.href);
+            console.log('sessionStorage atual:', {
+                authenticated: sessionStorage.getItem('admin_authenticated'),
+                username: sessionStorage.getItem('admin_username')
+            });
+            
+            // Verificar autenticação ao carregar
+            checkIfAlreadyAuthenticated();
+        });
+    </script>
 </body>
 </html>
