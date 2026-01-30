@@ -45,7 +45,7 @@ let appState = {
     lastSaveTime: null
 };
 
-// ============================================
+// ============================================ 
 // INICIALIZAÇÃO
 // ============================================
 
@@ -78,6 +78,92 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 });
+
+// ============================================
+// FUNÇÕES DE INICIALIZAÇÃO
+// ============================================
+
+async function waitForFirebase() {
+    return new Promise((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        const checkInterval = setInterval(() => {
+            attempts++;
+            
+            if (window.firebaseAppIntegration && 
+                (window.firebaseAppIntegration.initialized || attempts >= maxAttempts)) {
+                clearInterval(checkInterval);
+                resolve();
+            }
+            
+            if (attempts % 3 === 0) {
+                console.log(`⏳ Aguardando Firebase... (${attempts}/${maxAttempts})`);
+            }
+        }, 500);
+    });
+}
+
+async function initializeApp() {
+    try {
+        // 1. Carregar estado salvo
+        await loadSavedState();
+        
+        // 2. Atualizar interface
+        updateCurrentTime();
+        updateAnalystAvailability();
+        updateQueueOrder();
+        createAnalystStatusColumns();
+        updateSpecialCasesDisplay();
+        updateStatistics();
+        updateLastUpdateTime();
+        
+        // 3. Configurar eventos
+        setupEventListeners();
+        
+        // 4. Configurar auto-salvamento
+        setupAutoSave();
+        
+        // 5. Configurar auto-refresh
+        setupAutoRefresh();
+        
+        // 6. Verificar reset diário
+        checkDailyReset();
+        
+        // 7. Focar no input
+        focusMainInput();
+        
+        showNotification('Sistema carregado com sucesso!', 'success');
+        
+    } catch (error) {
+        console.error('❌ Erro na inicialização:', error);
+        showError('Erro ao inicializar: ' + error.message);
+    }
+}
+
+// ============================================
+// PERSISTÊNCIA
+// ============================================
+
+async function loadSavedState() {
+    console.log('📂 Carregando estado salvo...');
+    
+    // Tentar Firebase primeiro
+    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+        const savedState = await window.firebaseAppIntegration.loadFullState();
+        if (savedState) {
+            restoreFromFirebaseState(savedState);
+            appState.firebaseStatus = 'connected';
+            console.log('✅ Estado carregado do Firebase');
+            return;
+        }
+    }
+    
+    // Fallback para localStorage
+    loadFromLocalStorage();
+    appState.firebaseStatus = 'disconnected';
+    console.log('📱 Estado carregado do localStorage');
+}
 
 async function waitForFirebase() {
     return new Promise((resolve) => {
@@ -1487,5 +1573,76 @@ window.appController = {
     updateStatistics: updateStatistics,
     createAnalystStatusColumns: createAnalystStatusColumns
 };
+
+// ============================================
+// FORÇAR ATUALIZAÇÃO DA INTERFACE
+// ============================================
+
+// Atualizar interface após carregamento
+function forceInterfaceUpdate() {
+    if (window.analysts && window.analysts.length > 0) {
+        createAnalystStatusColumns();
+        updateSpecialCasesDisplay();
+        updateStatistics();
+        updateLastUpdateTime();
+        
+        // Atualizar sessão no rodapé
+        const sessionElement = document.getElementById('sessionId');
+        if (sessionElement && appState.sessionId) {
+            sessionElement.textContent = appState.sessionId.substring(0, 12) + '...';
+        }
+        
+        console.log('✅ Interface atualizada');
+    } else {
+        console.error('❌ Analistas não carregados');
+        // Tentar recarregar após 2 segundos
+        setTimeout(() => {
+            if (window.analysts && window.analysts.length > 0) {
+                forceInterfaceUpdate();
+            }
+        }, 2000);
+    }
+}
+
+// Adicionar chamada no initializeApp:
+async function initializeApp() {
+    try {
+        // 1. Carregar estado salvo
+        await loadSavedState();
+        
+        // 2. Atualizar interface
+        updateCurrentTime();
+        updateAnalystAvailability();
+        updateQueueOrder();
+        createAnalystStatusColumns();
+        updateSpecialCasesDisplay();
+        updateStatistics();
+        updateLastUpdateTime();
+        
+        // 3. Configurar eventos
+        setupEventListeners();
+        
+        // 4. Configurar auto-salvamento
+        setupAutoSave();
+        
+        // 5. Configurar auto-refresh
+        setupAutoRefresh();
+        
+        // 6. Verificar reset diário
+        checkDailyReset();
+        
+        // 7. Focar no input
+        focusMainInput();
+        
+        // 8. Forçar atualização final
+        setTimeout(forceInterfaceUpdate, 1000);
+        
+        showNotification('Sistema carregado com sucesso!', 'success');
+        
+    } catch (error) {
+        console.error('❌ Erro na inicialização:', error);
+        showError('Erro ao inicializar: ' + error.message);
+    }
+}
 
 console.log('✅ app.js v3.5.0 carregado com sucesso');
