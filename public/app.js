@@ -1,5 +1,3 @@
-// REMOVA TODO O CONTEÚDO ATUAL DO app.js E SUBSTITUA POR ESTE:
-
 // ============================================
 // PORTAL DE FILA DE CHAMADOS - PAYHUB
 // ============================================
@@ -54,9 +52,6 @@ let appState = {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Inicializando Portal v3.5.0...');
     
-    // Esconder loading overlay
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    
     // Inicializar de forma síncrona primeiro
     initializeAppSync();
     
@@ -68,9 +63,12 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('❌ Erro na inicialização async:', error);
         } finally {
-            // Sempre esconder loading
+            // Esconder loading overlay
+            const loadingOverlay = document.getElementById('loadingOverlay');
             if (loadingOverlay) {
-                loadingOverlay.style.display = 'none';
+                setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                }, 1000);
             }
         }
     }, 1000);
@@ -84,9 +82,6 @@ function initializeAppSync() {
         
         // Atualizar interface básica
         updateCurrentTime();
-        updateAnalystAvailability();
-        updateQueueOrder();
-        updateStatistics();
         updateLastUpdateTime();
         
         // Configurar eventos básicos
@@ -113,9 +108,14 @@ async function initializeAppAsync() {
         // Carregar estado salvo
         await loadSavedState();
         
+        // Atualizar disponibilidade baseada no horário
+        updateAnalystAvailability();
+        
         // Atualizar interface completa
         createAnalystStatusColumns();
         updateSpecialCasesDisplay();
+        updateQueueOrder();
+        updateStatistics();
         
         // Configurar auto-salvamento
         setupAutoSave();
@@ -164,11 +164,13 @@ async function waitForFirebase() {
 }
 
 // ============================================
-// PERSISTÊNCIA
+// PERSISTÊNCIA - CORRIGIDA
 // ============================================
 
 async function loadSavedState() {
     console.log('📂 Carregando estado salvo...');
+    
+    let loaded = false;
     
     try {
         // Tentar Firebase primeiro
@@ -178,7 +180,7 @@ async function loadSavedState() {
                 restoreFromFirebaseState(savedState);
                 appState.firebaseStatus = 'connected';
                 console.log('✅ Estado carregado do Firebase');
-                return;
+                loaded = true;
             }
         }
     } catch (firebaseError) {
@@ -186,9 +188,13 @@ async function loadSavedState() {
     }
     
     // Fallback para localStorage
-    loadFromLocalStorage();
-    appState.firebaseStatus = 'disconnected';
-    console.log('📱 Estado carregado do localStorage');
+    if (!loaded) {
+        loaded = loadFromLocalStorage();
+        appState.firebaseStatus = 'disconnected';
+        console.log('📱 Estado carregado do localStorage');
+    }
+    
+    return loaded;
 }
 
 async function saveState() {
@@ -197,21 +203,31 @@ async function saveState() {
     const stateToSave = prepareStateForSave();
     
     try {
-        // Salvar localmente
+        // Salvar localmente PRIMEIRO (mais rápido)
         saveToLocalStorage(stateToSave);
         
         // Salvar no Firebase se disponível
         if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
-            const success = await window.firebaseAppIntegration.saveFullState(stateToSave);
-            if (success) {
-                appState.firebaseStatus = 'connected';
-                appState.lastSaveTime = new Date();
-            } else {
+            try {
+                const success = await window.firebaseAppIntegration.saveFullState(stateToSave);
+                if (success) {
+                    appState.firebaseStatus = 'connected';
+                    appState.lastSaveTime = new Date();
+                    console.log('✅ Estado salvo no Firebase');
+                } else {
+                    appState.firebaseStatus = 'disconnected';
+                    console.log('✅ Estado salvo apenas localmente');
+                }
+            } catch (firebaseError) {
+                console.warn('⚠️ Erro ao salvar no Firebase:', firebaseError);
                 appState.firebaseStatus = 'disconnected';
             }
         }
+        
+        return true;
     } catch (error) {
         console.error('❌ Erro ao salvar estado:', error);
+        return false;
     }
 }
 
@@ -224,10 +240,15 @@ function prepareStateForSave() {
             lastReset: appState.lastReset,
             nextTicketNumber: appState.nextTicketNumber,
             simulatedTime: appState.simulatedTime ? appState.simulatedTime.getTime() : null,
-            lastSaveTime: new Date().toISOString()
+            lastSaveTime: new Date().toISOString(),
+            sessionId: appState.sessionId
         },
         analysts: window.analysts.map(a => ({
             id: a.id,
+            name: a.name,
+            level: a.level,
+            startTime: a.startTime,
+            endTime: a.endTime,
             isAvailable: a.isAvailable,
             isBusy: a.isBusy,
             currentTicket: a.currentTicket,
@@ -236,6 +257,7 @@ function prepareStateForSave() {
             ticketsHandled: a.ticketsHandled,
             isWaitingForClient: a.isWaitingForClient,
             inQueue: a.inQueue,
+            specialClient: a.specialClient,
             lastActivity: a.lastActivity ? a.lastActivity.toISOString() : null
         })),
         queueOrder: appState.queueOrder.map(a => a.id),
@@ -246,60 +268,76 @@ function prepareStateForSave() {
 }
 
 function restoreFromFirebaseState(savedState) {
-    if (!savedState) return;
+    if (!savedState) return false;
     
-    // Restaurar appState
-    if (savedState.appState) {
-        appState.ticketsToday = savedState.appState.ticketsToday || 0;
-        appState.specialTicketsToday = savedState.appState.specialTicketsToday || 0;
-        appState.waitingTicketsToday = savedState.appState.waitingTicketsToday || 0;
-        appState.lastReset = savedState.appState.lastReset || new Date().toLocaleDateString('pt-BR');
-        appState.nextTicketNumber = savedState.appState.nextTicketNumber || 1000;
-        
-        if (savedState.appState.simulatedTime) {
-            appState.simulatedTime = new Date(savedState.appState.simulatedTime);
-        }
-        
-        if (savedState.appState.lastSaveTime) {
-            appState.lastSaveTime = new Date(savedState.appState.lastSaveTime);
-        }
-    }
-    
-    // Restaurar analistas
-    if (savedState.analysts) {
-        savedState.analysts.forEach(savedAnalyst => {
-            const analyst = window.analysts.find(a => a.id === savedAnalyst.id);
-            if (analyst) {
-                analyst.isAvailable = savedAnalyst.isAvailable || false;
-                analyst.isBusy = savedAnalyst.isBusy || false;
-                analyst.currentTicket = savedAnalyst.currentTicket || null;
-                analyst.ticketStatus = savedAnalyst.ticketStatus || null;
-                analyst.ticketSpecialType = savedAnalyst.ticketSpecialType || null;
-                analyst.ticketsHandled = savedAnalyst.ticketsHandled || 0;
-                analyst.isWaitingForClient = savedAnalyst.isWaitingForClient || false;
-                analyst.inQueue = savedAnalyst.inQueue !== undefined ? savedAnalyst.inQueue : true;
-                analyst.lastActivity = savedAnalyst.lastActivity ? new Date(savedAnalyst.lastActivity) : null;
+    try {
+        // Restaurar appState
+        if (savedState.appState) {
+            appState.ticketsToday = savedState.appState.ticketsToday || 0;
+            appState.specialTicketsToday = savedState.appState.specialTicketsToday || 0;
+            appState.waitingTicketsToday = savedState.appState.waitingTicketsToday || 0;
+            appState.lastReset = savedState.appState.lastReset || new Date().toLocaleDateString('pt-BR');
+            appState.nextTicketNumber = savedState.appState.nextTicketNumber || 1000;
+            appState.sessionId = savedState.appState.sessionId || appState.sessionId;
+            
+            if (savedState.appState.simulatedTime) {
+                appState.simulatedTime = new Date(savedState.appState.simulatedTime);
             }
-        });
+            
+            if (savedState.appState.lastSaveTime) {
+                appState.lastSaveTime = new Date(savedState.appState.lastSaveTime);
+            }
+        }
+        
+        // Restaurar analistas
+        if (savedState.analysts && Array.isArray(savedState.analysts)) {
+            savedState.analysts.forEach(savedAnalyst => {
+                const analyst = window.analysts.find(a => a.id === savedAnalyst.id);
+                if (analyst) {
+                    analyst.isAvailable = savedAnalyst.isAvailable !== undefined ? savedAnalyst.isAvailable : false;
+                    analyst.isBusy = savedAnalyst.isBusy || false;
+                    analyst.currentTicket = savedAnalyst.currentTicket || null;
+                    analyst.ticketStatus = savedAnalyst.ticketStatus || null;
+                    analyst.ticketSpecialType = savedAnalyst.ticketSpecialType || null;
+                    analyst.ticketsHandled = savedAnalyst.ticketsHandled || 0;
+                    analyst.isWaitingForClient = savedAnalyst.isWaitingForClient || false;
+                    analyst.inQueue = savedAnalyst.inQueue !== undefined ? savedAnalyst.inQueue : true;
+                    
+                    if (savedAnalyst.lastActivity) {
+                        analyst.lastActivity = new Date(savedAnalyst.lastActivity);
+                    }
+                }
+            });
+        }
+        
+        // Restaurar fila
+        if (savedState.queueOrder && Array.isArray(savedState.queueOrder)) {
+            appState.queueOrder = savedState.queueOrder.map(id => 
+                window.analysts.find(a => a.id === id)
+            ).filter(a => a);
+        }
+        
+        // Restaurar sessionId
+        if (savedState.sessionId) {
+            appState.sessionId = savedState.sessionId;
+            sessionStorage.setItem('queue_session_id', savedState.sessionId);
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Erro ao restaurar estado do Firebase:', error);
+        return false;
     }
-    
-    // Restaurar fila
-    if (savedState.queueOrder) {
-        appState.queueOrder = savedState.queueOrder.map(id => 
-            window.analysts.find(a => a.id === id)
-        ).filter(a => a);
-    }
-    
-    updateAnalystAvailability();
-    updateQueueOrder();
-    updateStatistics();
 }
 
 function saveToLocalStorage(state) {
     try {
         localStorage.setItem('queue_state', JSON.stringify(state));
+        console.log('✅ Estado salvo no localStorage');
+        return true;
     } catch (error) {
         console.error('❌ Erro ao salvar no localStorage:', error);
+        return false;
     }
 }
 
@@ -308,10 +346,12 @@ function loadFromLocalStorage() {
         const saved = localStorage.getItem('queue_state');
         if (saved) {
             const state = JSON.parse(saved);
-            restoreFromFirebaseState(state);
+            return restoreFromFirebaseState(state);
         }
+        return false;
     } catch (error) {
         console.error('❌ Erro ao carregar do localStorage:', error);
+        return false;
     }
 }
 
@@ -326,7 +366,7 @@ function createAnalystStatusColumns() {
         return;
     }
     
-    // Atualizar status
+    // Atualizar status baseado no horário atual
     updateAnalystStatusFlags();
     
     // Filtrar analistas
@@ -407,7 +447,7 @@ function createAnalystStatusColumns() {
                 <div class="waiting-item">
                     <span>${analyst.name}</span>
                     <small>${analyst.currentTicket || 'Sem ticket'}</small>
-                    <button class="btn-small resume-btn" data-id="${analyst.id}" onclick="resumeTicket(${analyst.id})">
+                    <button class="btn-small resume-btn" onclick="resumeTicket(${analyst.id})">
                         <i class="fas fa-play"></i> Retomar
                     </button>
                 </div>
@@ -449,7 +489,7 @@ function createAnalystStatusColumns() {
     
     container.innerHTML = html;
     
-    // Adicionar eventos
+    // Adicionar eventos aos botões
     attachCardEvents();
 }
 
@@ -464,7 +504,7 @@ function createAnalystCardHTML(analyst, status) {
             <div class="quick-assign">
                 <input type="text" class="quick-input" data-id="${analyst.id}" 
                        placeholder="Nº chamado" value="">
-                <button class="btn-small assign-btn" data-id="${analyst.id}" onclick="handleQuickAssign(${analyst.id})">
+                <button class="btn-small assign-btn" onclick="handleQuickAssign(${analyst.id})">
                     <i class="fas fa-paperclip"></i> Atribuir
                 </button>
             </div>
@@ -478,10 +518,10 @@ function createAnalystCardHTML(analyst, status) {
                 <strong><i class="fas fa-ticket-alt"></i> ${analyst.currentTicket}</strong>
                 ${specialTag}
                 <div class="ticket-actions">
-                    <button class="btn-small wait-btn" data-id="${analyst.id}" onclick="setTicketWaiting(${analyst.id})">
+                    <button class="btn-small wait-btn" onclick="setTicketWaiting(${analyst.id})">
                         <i class="fas fa-clock"></i> Aguardar
                     </button>
-                    <button class="btn-small finish-btn" data-id="${analyst.id}" onclick="finishTicket(${analyst.id})">
+                    <button class="btn-small finish-btn" onclick="finishTicket(${analyst.id})">
                         <i class="fas fa-check"></i> Finalizar
                     </button>
                 </div>
@@ -519,12 +559,15 @@ function createAnalystCardHTML(analyst, status) {
 }
 
 // ============================================
-// FUNÇÕES DE ATRIBUIÇÃO DE TICKETS
+// FUNÇÕES DE ATRIBUIÇÃO DE TICKETS - CORRIGIDAS
 // ============================================
 
 async function assignTicketToAnalyst(analystId, ticketNumber, ticketType = 'normal') {
     const analyst = window.analysts.find(a => a.id === analystId);
-    if (!analyst) return;
+    if (!analyst) {
+        showNotification('Analista não encontrado', 'error');
+        return;
+    }
     
     // Verificar disponibilidade
     if (!analyst.isAvailable) {
@@ -560,7 +603,7 @@ async function assignTicketToAnalyst(analystId, ticketNumber, ticketType = 'norm
         appState.specialTicketsToday++;
     }
     
-    // Salvar no Firebase
+    // Salvar ticket no Firebase para relatórios
     if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
         try {
             await window.firebaseAppIntegration.saveTicketToFirebase(
@@ -580,7 +623,7 @@ async function assignTicketToAnalyst(analystId, ticketNumber, ticketType = 'norm
     updateSpecialCasesDisplay();
     createAnalystStatusColumns();
     
-    // Salvar estado
+    // Salvar estado COMPLETO
     await saveState();
     
     showNotification(`Ticket ${ticketNumber} atribuído a ${analyst.name}`, 'success');
@@ -588,11 +631,14 @@ async function assignTicketToAnalyst(analystId, ticketNumber, ticketType = 'norm
 
 async function finishTicket(analystId) {
     const analyst = window.analysts.find(a => a.id === analystId);
-    if (!analyst) return;
+    if (!analyst) {
+        showNotification('Analista não encontrado', 'error');
+        return;
+    }
     
     const ticketNumber = analyst.currentTicket;
     
-    // Salvar no Firebase
+    // Atualizar ticket no Firebase
     if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized && ticketNumber) {
         try {
             await window.firebaseAppIntegration.updateTicketStatus(ticketNumber, 'finalizado', analyst.name);
@@ -608,6 +654,7 @@ async function finishTicket(analystId) {
     analyst.ticketSpecialType = null;
     analyst.inQueue = analyst.level === "N1";
     analyst.isWaitingForClient = false;
+    analyst.lastActivity = new Date();
     
     // Atualizar interface
     updateQueueOrder();
@@ -615,7 +662,7 @@ async function finishTicket(analystId) {
     updateSpecialCasesDisplay();
     createAnalystStatusColumns();
     
-    // Salvar estado
+    // Salvar estado COMPLETO
     await saveState();
     
     showNotification(`Ticket ${ticketNumber} finalizado`, 'success');
@@ -623,11 +670,14 @@ async function finishTicket(analystId) {
 
 async function setTicketWaiting(analystId) {
     const analyst = window.analysts.find(a => a.id === analystId);
-    if (!analyst) return;
+    if (!analyst) {
+        showNotification('Analista não encontrado', 'error');
+        return;
+    }
     
     const ticketNumber = analyst.currentTicket;
     
-    // Salvar no Firebase
+    // Atualizar ticket no Firebase
     if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized && ticketNumber) {
         try {
             await window.firebaseAppIntegration.updateTicketStatus(ticketNumber, 'aguardando', analyst.name);
@@ -649,7 +699,7 @@ async function setTicketWaiting(analystId) {
     updateSpecialCasesDisplay();
     createAnalystStatusColumns();
     
-    // Salvar estado
+    // Salvar estado COMPLETO
     await saveState();
     
     showNotification(`${analyst.name} aguardando retorno do cliente`, 'info');
@@ -657,11 +707,14 @@ async function setTicketWaiting(analystId) {
 
 async function resumeTicket(analystId) {
     const analyst = window.analysts.find(a => a.id === analystId);
-    if (!analyst) return;
+    if (!analyst) {
+        showNotification('Analista não encontrado', 'error');
+        return;
+    }
     
     const ticketNumber = analyst.currentTicket;
     
-    // Salvar no Firebase
+    // Atualizar ticket no Firebase
     if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized && ticketNumber) {
         try {
             await window.firebaseAppIntegration.updateTicketStatus(ticketNumber, 'iniciado', analyst.name);
@@ -683,7 +736,7 @@ async function resumeTicket(analystId) {
     updateSpecialCasesDisplay();
     createAnalystStatusColumns();
     
-    // Salvar estado
+    // Salvar estado COMPLETO
     await saveState();
     
     showNotification(`${analyst.name} retomou o atendimento`, 'success');
@@ -705,7 +758,7 @@ function handleQuickAssign(analystId) {
 }
 
 // ============================================
-// FUNÇÕES AUXILIARES
+// FUNÇÕES AUXILIARES - CORRIGIDAS
 // ============================================
 
 function updateAnalystAvailability() {
@@ -715,6 +768,7 @@ function updateAnalystAvailability() {
     const currentTime = currentHour + currentMinutes / 100;
     
     let needsRefresh = false;
+    let needsSave = false;
     
     window.analysts.forEach(analyst => {
         const newAvailability = (currentTime >= analyst.startTime && currentTime < analyst.endTime);
@@ -722,17 +776,17 @@ function updateAnalystAvailability() {
         if (analyst.isAvailable !== newAvailability) {
             analyst.isAvailable = newAvailability;
             needsRefresh = true;
-        }
-        
-        // Se saiu do horário, liberar
-        if (!analyst.isAvailable && (analyst.isBusy || analyst.currentTicket)) {
-            analyst.isBusy = false;
-            analyst.currentTicket = null;
-            analyst.ticketStatus = null;
-            analyst.ticketSpecialType = null;
-            analyst.isWaitingForClient = false;
-            analyst.inQueue = false;
-            needsRefresh = true;
+            
+            // Se saiu do horário, liberar ticket
+            if (!analyst.isAvailable && (analyst.isBusy || analyst.currentTicket)) {
+                analyst.isBusy = false;
+                analyst.currentTicket = null;
+                analyst.ticketStatus = null;
+                analyst.ticketSpecialType = null;
+                analyst.isWaitingForClient = false;
+                analyst.inQueue = false;
+                needsSave = true;
+            }
         }
     });
     
@@ -740,10 +794,11 @@ function updateAnalystAvailability() {
         updateQueueOrder();
         updateStatistics();
         updateSpecialCasesDisplay();
-        saveState();
+        
+        if (needsSave) {
+            saveState(); // Não precisa await aqui
+        }
     }
-    
-    return needsRefresh;
 }
 
 function updateAnalystStatusFlags() {
@@ -754,15 +809,20 @@ function updateAnalystStatusFlags() {
     
     window.analysts.forEach(analyst => {
         // Atualizar disponibilidade por horário
-        analyst.isAvailable = (currentTime >= analyst.startTime && currentTime < analyst.endTime);
+        const shouldBeAvailable = (currentTime >= analyst.startTime && currentTime < analyst.endTime);
         
-        // Se saiu do horário, liberar
-        if (!analyst.isAvailable) {
-            analyst.isBusy = false;
-            analyst.currentTicket = null;
-            analyst.ticketStatus = null;
-            analyst.isWaitingForClient = false;
-            analyst.inQueue = false;
+        // Se mudou a disponibilidade, atualizar
+        if (analyst.isAvailable !== shouldBeAvailable) {
+            analyst.isAvailable = shouldBeAvailable;
+            
+            // Se saiu do horário, liberar
+            if (!analyst.isAvailable) {
+                analyst.isBusy = false;
+                analyst.currentTicket = null;
+                analyst.ticketStatus = null;
+                analyst.isWaitingForClient = false;
+                analyst.inQueue = false;
+            }
         }
     });
 }
@@ -917,25 +977,12 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-function showError(message) {
-    showNotification(message, 'error');
-}
-
 function generateSessionId() {
     return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
 function isTicketAlreadyExists(ticketNumber) {
     return window.analysts.some(a => a.currentTicket === ticketNumber);
-}
-
-function isSpecialClientTicket(ticketNumber, client) {
-    return ticketNumber.toString().toUpperCase().includes(client.toUpperCase());
-}
-
-function hideLoginModal() {
-    const modal = document.getElementById('loginModal');
-    if (modal) modal.style.display = 'none';
 }
 
 function focusMainInput() {
@@ -1092,12 +1139,15 @@ async function freeAllAnalysts() {
         return;
     }
     
-    // Salvar tickets no Firebase
-    window.analysts.forEach(analyst => {
+    // Finalizar tickets no Firebase
+    const promises = window.analysts.map(analyst => {
         if (analyst.currentTicket && window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
-            window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
+            return window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
         }
+        return Promise.resolve();
     });
+    
+    await Promise.all(promises);
     
     // Resetar todos os analistas
     window.analysts.forEach(analyst => {
@@ -1107,13 +1157,19 @@ async function freeAllAnalysts() {
         analyst.ticketSpecialType = null;
         analyst.isWaitingForClient = false;
         analyst.inQueue = analyst.level === "N1";
+        analyst.lastActivity = new Date();
     });
     
+    // Resetar contadores
+    appState.waitingTicketsToday = 0;
+    
+    // Atualizar interface
     updateQueueOrder();
     updateStatistics();
     createAnalystStatusColumns();
     updateSpecialCasesDisplay();
     
+    // Salvar estado
     await saveState();
     
     showNotification('Todos os analistas foram liberados', 'success');
@@ -1125,11 +1181,14 @@ async function resetQueue() {
     }
     
     // Finalizar tickets no Firebase
-    window.analysts.forEach(analyst => {
+    const promises = window.analysts.map(analyst => {
         if (analyst.currentTicket && window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
-            window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
+            return window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
         }
+        return Promise.resolve();
     });
+    
+    await Promise.all(promises);
     
     // Resetar estado
     appState.ticketsToday = 0;
@@ -1138,6 +1197,7 @@ async function resetQueue() {
     appState.lastReset = new Date().toLocaleDateString('pt-BR');
     appState.queueOrder = [];
     appState.nextTicketNumber = 1000;
+    appState.dailyResetDone = true;
     
     // Resetar analistas
     window.analysts.forEach(analyst => {
@@ -1151,11 +1211,13 @@ async function resetQueue() {
         analyst.lastActivity = null;
     });
     
+    // Atualizar interface
     updateQueueOrder();
     updateStatistics();
     createAnalystStatusColumns();
     updateSpecialCasesDisplay();
     
+    // Salvar estado
     await saveState();
     
     showNotification('Fila reiniciada para o novo dia!', 'success');
@@ -1173,7 +1235,7 @@ function nextAnalyst() {
     
     updateStatistics();
     showNotification(`Próximo: ${appState.queueOrder[0]?.name || 'Nenhum'}`, 'info');
-    saveState();
+    saveState(); // Salvar estado
 }
 
 // ============================================
@@ -1196,7 +1258,7 @@ function closeTimeSimulationModal() {
     document.getElementById('timeSimulationModal').style.display = 'none';
 }
 
-function applyTimeSimulation() {
+async function applyTimeSimulation() {
     const selected = document.querySelector('.time-option.active');
     if (!selected) {
         showNotification('Selecione um horário', 'warning');
@@ -1214,17 +1276,17 @@ function applyTimeSimulation() {
     createAnalystStatusColumns();
     
     showNotification(`Horário simulado: ${hour}:00`, 'success');
-    saveState();
+    await saveState();
 }
 
-function returnToRealTime() {
+async function returnToRealTime() {
     appState.simulatedTime = null;
     updateCurrentTime();
     updateAnalystAvailability();
     createAnalystStatusColumns();
     
     showNotification('Voltando ao horário real', 'info');
-    saveState();
+    await saveState();
 }
 
 function openReportModal() {
@@ -1314,9 +1376,11 @@ async function generateCSVReport() {
 function setupAutoSave() {
     // Salvar a cada 30 segundos
     setInterval(async () => {
-        if (window.firebaseAppIntegration?.initialized) {
+        try {
             await saveState();
             console.log('💾 Auto-salvamento realizado');
+        } catch (error) {
+            console.error('❌ Erro no auto-salvamento:', error);
         }
     }, 30000);
 }
@@ -1333,6 +1397,9 @@ function setupAutoRefresh() {
     
     // Atualizar estatísticas a cada 30 segundos
     setInterval(updateStatistics, 30000);
+    
+    // Atualizar último update a cada 10 segundos
+    setInterval(updateLastUpdateTime, 10000);
 }
 
 async function testFirebase() {
@@ -1353,6 +1420,61 @@ async function testFirebase() {
 }
 
 // ============================================
+// FUNÇÕES DE DIAGNÓSTICO E TESTE
+// ============================================
+
+window.testPersistence = async function() {
+    console.log('🧪 Testando persistência...');
+    
+    // 1. Verificar estado atual
+    console.log('📊 Estado atual:');
+    window.analysts.forEach(a => {
+        if (a.currentTicket) {
+            console.log(`  ${a.name}: ${a.currentTicket} (${a.ticketStatus})`);
+        }
+    });
+    
+    // 2. Salvar estado
+    await saveState();
+    
+    // 3. Verificar localStorage
+    const saved = localStorage.getItem('queue_state');
+    if (!saved) {
+        console.error('❌ Nenhum estado salvo no localStorage');
+        return false;
+    }
+    
+    const state = JSON.parse(saved);
+    const activeTickets = state.analysts?.filter(a => a.currentTicket) || [];
+    
+    console.log('✅ Estado salvo:', {
+        analistas: state.analysts?.length || 0,
+        ticketsHoje: state.appState?.ticketsToday || 0,
+        ticketsAtivos: activeTickets.length,
+        especialHoje: state.appState?.specialTicketsToday || 0
+    });
+    
+    if (activeTickets.length > 0) {
+        console.log('📝 Tickets ativos salvos:');
+        activeTickets.forEach(a => {
+            console.log(`  ${a.name}: ${a.currentTicket}`);
+        });
+    }
+    
+    return true;
+};
+
+// Log periódico para diagnóstico (opcional)
+setInterval(() => {
+    const activeTickets = window.analysts.filter(a => a.currentTicket);
+    if (activeTickets.length > 0) {
+        console.log('🔄 Tickets ativos:', activeTickets.map(a => 
+            `${a.name}: ${a.currentTicket}`
+        ).join(', '));
+    }
+}, 60000); // A cada minuto
+
+// ============================================
 // EXPORTAÇÃO GLOBAL
 // ============================================
 
@@ -1362,7 +1484,8 @@ window.appController = {
     saveState: saveState,
     showNotification: showNotification,
     updateStatistics: updateStatistics,
-    createAnalystStatusColumns: createAnalystStatusColumns
+    createAnalystStatusColumns: createAnalystStatusColumns,
+    testPersistence: window.testPersistence
 };
 
-console.log('✅ app.js v3.5.0 carregado com sucesso');
+console.log('✅ app.js v3.5.0 CORRIGIDO carregado com sucesso');
