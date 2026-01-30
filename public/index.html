@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal de Fila de Chamados - Payhub</title>
     
-    <!-- CDNs -->
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Firebase SDK -->
@@ -16,21 +18,88 @@
     
     <!-- Estilos -->
     <link rel="stylesheet" href="style.css">
+    
+    <style>
+        .firebase-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: 10px;
+            font-weight: 500;
+        }
+        .firebase-status.connected {
+            background: #E8F5E9;
+            color: #2E7D32;
+            border: 1px solid #C8E6C9;
+        }
+        .firebase-status.disconnected {
+            background: #FFEBEE;
+            color: #C62828;
+            border: 1px solid #FFCDD2;
+        }
+        .last-saved {
+            font-size: 11px;
+            color: #666;
+            margin-left: 10px;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .loading-spinner-large {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
+    <!-- Overlay de carregamento -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner-large"></div>
+        <div style="font-size: 14px; color: #333; margin-top: 10px;">Inicializando sistema...</div>
+        <div id="loadingStatus" style="font-size: 12px; color: #666; margin-top: 5px;">Conectando ao Firebase</div>
+    </div>
+
     <div class="container">
         <!-- Cabeçalho -->
         <div class="header">
             <div class="header-content">
                 <h1>
                     <i class="fas fa-headset"></i>
-                    Portal de Fila de Chamados - Payhub v3.4.0
+                    Portal de Fila de Chamados - Payhub
+                    <span id="versionBadge" class="version-badge">v3.5.0</span>
                 </h1>
-                <p>Sistema otimizado com integração Firebase</p>
+                <p>Controle de atendimentos com persistência completa em Firebase</p>
             </div>
-            <div class="user-info" id="userInfo">
-                <i class="fas fa-user"></i>
-                <span id="userName">Não logado</span>
+            <div class="header-right">
+                <div id="firebaseStatus" class="firebase-status">
+                    <i class="fas fa-circle"></i>
+                    <span>Conectando...</span>
+                </div>
+                <div id="lastSaved" class="last-saved" style="display: none;">
+                    <i class="far fa-clock"></i>
+                    <span>Salvo: --:--:--</span>
+                </div>
             </div>
         </div>
         
@@ -38,7 +107,7 @@
         <div class="nav-menu">
             <a href="index.html" class="nav-link active">
                 <i class="fas fa-home"></i>
-                Principal
+                Painel Principal
             </a>
             <a href="analyst-view.html" class="nav-link">
                 <i class="fas fa-eye"></i>
@@ -53,7 +122,7 @@
         <!-- Painel de tempo -->
         <div class="time-panel">
             <div class="time-info">
-                <i class="fas fa-clock" style="font-size: 24px;"></i>
+                <i class="fas fa-clock"></i>
                 <div class="time-text">
                     <div class="time-date" id="currentDate">Carregando data...</div>
                     <div class="time-clock" id="currentTime">Carregando hora...</div>
@@ -70,9 +139,9 @@
             <div class="card-title">
                 <i class="fas fa-columns"></i>
                 Status dos Analistas
+                <span id="analystCount" class="counter-badge">9 analistas</span>
             </div>
             <div id="analystStatusColumns">
-                <!-- As colunas serão geradas dinamicamente pelo app.js -->
                 <div class="loading">
                     <div class="loading-spinner"></div>
                     <span>Carregando status dos analistas...</span>
@@ -138,11 +207,9 @@
                     Adicionar Chamado Especial
                 </button>
             </div>
-            <div class="info-box" style="margin: 0 20px 20px 20px;">
-                <div style="font-size: 12px; color: #666;">
-                    <i class="fas fa-info-circle"></i>
-                    <strong>Informação:</strong> Use os inputs nos cards dos analistas disponíveis para atribuição rápida de chamados normais. Para clientes especiais, use este painel.
-                </div>
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <strong>Informação:</strong> Use os inputs nos cards dos analistas disponíveis para atribuição rápida de chamados normais. Para clientes especiais, use este painel.
             </div>
         </div>
         
@@ -177,8 +244,7 @@
                     <i class="fas fa-file-csv"></i>
                     Gerar Relatório
                 </button>
-                <!-- Botão de teste Firebase -->
-                <button class="btn btn-test" id="testFirebaseBtn" style="background: #6A1B9A; color: white;">
+                <button class="btn btn-test" id="testFirebaseBtn">
                     <i class="fas fa-vial"></i>
                     Testar Firebase
                 </button>
@@ -187,8 +253,8 @@
         
         <!-- Rodapé -->
         <div class="footer">
-            <p><strong>Portal de Fila de Chamados - Equipe Payhub v3.4.0</strong> | Sistema com integração Firebase</p>
-            <p>Última atualização: <span id="lastUpdate">--:--:--</span></p>
+            <p><strong>Portal de Fila de Chamados - Equipe Payhub v3.5.0</strong> | Sistema com persistência completa Firebase</p>
+            <p>Última atualização: <span id="lastUpdate">--:--:--</span> | Sessão: <span id="sessionId">---</span></p>
             <p class="last-reset">Fila reiniciada em: <span id="lastResetDate"></span></p>
         </div>
     </div>
@@ -271,112 +337,17 @@
         </div>
     </div>
     
-    <!-- Modal de Login (Oculto por padrão) -->
-    <div id="loginModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Login do Sistema
-                </div>
-                <button class="close-modal" id="closeLoginModal">&times;</button>
-            </div>
-            <div class="modal-description">
-                <p>Entre com suas credenciais para acessar o sistema de fila:</p>
-                <p style="margin-top: 10px; background: #FFF3E0; padding: 10px; border-radius: 6px; font-size: 13px;">
-                    <i class="fas fa-lightbulb"></i> 
-                    <strong>Para teste use:</strong> qualquer@email.com / dev123
-                </p>
-            </div>
-            <div class="modal-controls">
-                <div class="form-group">
-                    <label for="loginEmail">
-                        <i class="fas fa-envelope"></i>
-                        E-mail
-                    </label>
-                    <input type="email" id="loginEmail" class="input-field" 
-                           placeholder="seu.email@dominio.com" value="admin@payhub.com.br">
-                </div>
-                <div class="form-group">
-                    <label for="loginPassword">
-                        <i class="fas fa-lock"></i>
-                        Senha
-                    </label>
-                    <input type="password" id="loginPassword" class="input-field" 
-                           placeholder="Sua senha" value="dev123">
-                </div>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="rememberMe" checked>
-                    <label for="rememberMe">Lembrar-me</label>
-                </div>
-                <div class="error-box" id="loginError" style="display: none;">
-                    <div class="error-content">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <span id="loginErrorMessage"></span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn" id="closeLoginBtn">Cancelar</button>
-                <button class="btn btn-success" id="loginBtn">Entrar</button>
-            </div>
-        </div>
-    </div>
-    
     <!-- Scripts -->
     <script src="firebase-config.js"></script>
     <script src="firebase-app.js"></script>
     <script src="app.js"></script>
     
     <script>
-        // Inicialização adicional
-        document.addEventListener('DOMContentLoaded', function() {
-            // Botão de fechar modal de login
-            const closeLoginBtn = document.getElementById('closeLoginBtn');
-            const closeLoginModalBtn = document.getElementById('closeLoginModal');
-            
-            if (closeLoginBtn) {
-                closeLoginBtn.addEventListener('click', function() {
-                    document.getElementById('loginModal').style.display = 'none';
-                });
-            }
-            
-            if (closeLoginModalBtn) {
-                closeLoginModalBtn.addEventListener('click', function() {
-                    document.getElementById('loginModal').style.display = 'none';
-                });
-            }
-            
-            // Botão de teste Firebase
-            const testFirebaseBtn = document.getElementById('testFirebaseBtn');
-            if (testFirebaseBtn) {
-                testFirebaseBtn.addEventListener('click', async function() {
-                    showNotification('Testando conexão com Firebase...', 'info');
-                    
-                    const result = await window.testFirebaseIntegration();
-                    if (result) {
-                        showNotification('✅ Firebase conectado com sucesso!', 'success');
-                    } else {
-                        showNotification('❌ Erro na conexão com Firebase', 'error');
-                    }
-                });
-            }
-            
-            // Fechar modais ao clicar fora
-            document.addEventListener('click', function(event) {
-                if (event.target.classList.contains('modal')) {
-                    event.target.style.display = 'none';
-                }
-            });
-            
-            // Fechar modais com ESC
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    document.querySelectorAll('.modal').forEach(modal => {
-                        modal.style.display = 'none';
-                    });
-                }
-            });
+        // Esconder overlay quando tudo estiver carregado
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }, 1500);
         });
     </script>
 </body>
