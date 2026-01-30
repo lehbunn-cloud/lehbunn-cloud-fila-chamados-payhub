@@ -221,7 +221,8 @@
                            class="form-input" 
                            placeholder="Digite seu usuário"
                            required
-                           autocomplete="username">
+                           autocomplete="username"
+                           value="admin">
                 </div>
                 
                 <div class="form-group">
@@ -235,7 +236,8 @@
                                class="form-input" 
                                placeholder="Digite sua senha"
                                required
-                               autocomplete="current-password">
+                               autocomplete="current-password"
+                               value="admin123">
                         <button type="button" class="password-toggle" id="togglePassword">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -258,116 +260,82 @@
         </div>
     </div>
     
-    <!-- Scripts -->
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('=== LOGIN PAGE LOADED ===');
-        
-        const loginForm = document.getElementById('loginForm');
-        const loginBtn = document.getElementById('loginBtn');
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const loginError = document.getElementById('loginError');
-        const errorText = document.getElementById('errorText');
-        const togglePassword = document.getElementById('togglePassword');
-        const passwordInput = document.getElementById('password');
-        
-        // Credenciais de administrador
-        const ADMIN_CREDENTIALS = {
-            username: 'admin',
-            password: 'admin123'
-        };
-        
-        // Alternar visibilidade da senha
-        togglePassword.addEventListener('click', function() {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
-        });
-        
-        // Processar login - VERSÃO SIMPLIFICADA
-        loginForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== LOGIN PAGE LOADED ===');
             
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
+            // Credenciais fixas
+            const USERNAME = 'admin';
+            const PASSWORD = 'admin123';
             
-            console.log('Tentando login com:', { username: username });
+            const form = document.getElementById('loginForm');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const togglePassword = document.getElementById('togglePassword');
+            const loginBtn = document.getElementById('loginBtn');
+            const errorDiv = document.getElementById('loginError');
+            const errorText = document.getElementById('errorText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
             
-            if (!username || !password) {
-                errorText.textContent = 'Preencha todos os campos';
-                loginError.classList.add('show');
-                return;
-            }
+            // Colocar valores padrão para facilitar teste
+            usernameInput.value = USERNAME;
+            passwordInput.value = PASSWORD;
             
-            // Mostrar loading
-            loginBtn.disabled = true;
-            loadingSpinner.style.display = 'block';
-            loginBtn.querySelector('span').textContent = 'Autenticando...';
-            loginError.classList.remove('show');
+            // Mostrar/ocultar senha
+            togglePassword.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+            });
             
-            // Verificar credenciais com delay
-            await new Promise(resolve => setTimeout(resolve, 800));
-            
-            // Verificar credenciais
-            if (username === ADMIN_CREDENTIALS.username && 
-                password === ADMIN_CREDENTIALS.password) {
+            // Tratar login
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
                 
-                console.log('✅ CREDENCIAIS CORRETAS');
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value.trim();
                 
-                // Login bem-sucedido - SALVAR EM LOCALSTORAGE também
-                sessionStorage.setItem('admin_authenticated', 'true');
-                sessionStorage.setItem('admin_username', username);
-                sessionStorage.setItem('admin_login_time', new Date().toISOString());
+                // Mostrar loading
+                loginBtn.disabled = true;
+                loadingSpinner.style.display = 'block';
+                errorDiv.classList.remove('show');
                 
-                // Também salvar em localStorage como backup
-                localStorage.setItem('admin_authenticated', 'true');
-                localStorage.setItem('admin_username', username);
-                localStorage.setItem('admin_login_time', new Date().toISOString());
-                
-                console.log('Dados salvos:', {
-                    session: {
-                        authenticated: sessionStorage.getItem('admin_authenticated'),
-                        username: sessionStorage.getItem('admin_username')
-                    },
-                    local: {
-                        authenticated: localStorage.getItem('admin_authenticated'),
-                        username: localStorage.getItem('admin_username')
+                // Simular delay de rede
+                setTimeout(function() {
+                    // Verificar credenciais
+                    if (username === USERNAME && password === PASSWORD) {
+                        console.log('✅ Login bem-sucedido!');
+                        
+                        // Salvar autenticação de forma SIMPLES
+                        localStorage.setItem('admin_auth', 'true');
+                        localStorage.setItem('admin_user', username);
+                        localStorage.setItem('admin_time', Date.now().toString());
+                        
+                        // Também em sessionStorage
+                        sessionStorage.setItem('admin_auth', 'true');
+                        sessionStorage.setItem('admin_user', username);
+                        sessionStorage.setItem('admin_time', Date.now().toString());
+                        
+                        // REDIRECIONAR DIRETAMENTE
+                        console.log('Redirecionando para dashboard...');
+                        window.location.href = 'admin-dashboard.html';
+                        
+                    } else {
+                        console.log('❌ Credenciais inválidas');
+                        errorText.textContent = 'Usuário ou senha incorretos';
+                        errorDiv.classList.add('show');
+                        
+                        // Resetar botão
+                        loginBtn.disabled = false;
+                        loadingSpinner.style.display = 'none';
                     }
-                });
-                
-                // Redirecionamento SIMPLES
-                console.log('🔗 Redirecionando...');
-                window.location.href = 'admin-dashboard.html';
-                
-            } else {
-                // Login falhou
-                console.log('❌ CREDENCIAIS INCORRETAS');
-                errorText.textContent = 'Usuário ou senha incorretos';
-                loginError.classList.add('show');
-                
-                // Resetar botão
-                loginBtn.disabled = false;
-                loadingSpinner.style.display = 'none';
-                loginBtn.querySelector('span').textContent = 'Entrar';
-                
-                // Limpar campos
-                document.getElementById('password').value = '';
-                document.getElementById('username').focus();
-                document.getElementById('username').select();
-            }
+                }, 500);
+            });
+            
+            // Focar na senha (já que usuário está preenchido)
+            passwordInput.focus();
+            passwordInput.select();
         });
-        
-        // Focar no campo de usuário
-        document.getElementById('username').focus();
-        
-        // Log para debug
-        console.log('URL atual:', window.location.href);
-        console.log('sessionStorage atual:', {
-            authenticated: sessionStorage.getItem('admin_authenticated'),
-            username: sessionStorage.getItem('admin_username')
-        });
-    });
-</script>
+    </script>
 </body>
 </html>
