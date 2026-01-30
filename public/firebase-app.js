@@ -111,39 +111,31 @@ class FirebaseAppIntegration {
         });
     }
 
-    setupPersistence() {
-        if (!this.db) return;
-        
-        this.db.enablePersistence()
-            .then(() => console.log('✅ Persistência offline configurada'))
-            .catch(err => {
-                if (err.code === 'failed-precondition') {
-                    console.warn('⚠️ Múltiplas abas abertas');
-                } else if (err.code === 'unimplemented') {
-                    console.warn('⚠️ Persistência não suportada');
-                }
-            });
-    }
-
     // ============================================
-    // PERSISTÊNCIA DE ESTADO COMPLETO
+    // PERSISTÊNCIA DE ESTADO COMPLETO - CORRIGIDA
     // ============================================
 
     async saveFullState(stateData) {
         if (!this.initialized || !this.db) {
             console.warn('⚠️ Firebase não disponível, salvando localmente');
-            this.saveToLocalStorage('full_state', stateData);
             return false;
         }
 
         try {
-            const stateRef = this.db.collection('queue_states').doc(this.sessionId);
+            const sessionId = stateData.sessionId || this.sessionId;
+            if (!sessionId) {
+                console.error('❌ Sem sessionId para salvar estado');
+                return false;
+            }
+
+            const stateRef = this.db.collection('queue_states').doc(sessionId);
             
             const saveData = {
                 ...stateData,
-                sessionId: this.sessionId,
+                sessionId: sessionId,
                 savedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                version: stateData.version || '3.5.0'
             };
             
             await stateRef.set(saveData, { merge: true });
@@ -155,7 +147,6 @@ class FirebaseAppIntegration {
             
         } catch (error) {
             console.error('❌ Erro ao salvar estado:', error);
-            this.saveToLocalStorage('full_state', stateData);
             return false;
         }
     }
@@ -163,12 +154,18 @@ class FirebaseAppIntegration {
     async loadFullState() {
         if (!this.initialized || !this.db) {
             console.warn('⚠️ Firebase não disponível, carregando localmente');
-            return this.loadFromLocalStorage('full_state');
+            return null;
         }
 
         try {
+            const sessionId = this.getSessionId();
+            if (!sessionId) {
+                console.error('❌ Sem sessionId para carregar estado');
+                return null;
+            }
+
             // Tentar carregar pela sessão atual
-            let stateRef = this.db.collection('queue_states').doc(this.sessionId);
+            let stateRef = this.db.collection('queue_states').doc(sessionId);
             let doc = await stateRef.get();
             
             if (!doc.exists) {
@@ -189,13 +186,24 @@ class FirebaseAppIntegration {
             }
             
             const stateData = doc.data();
-            console.log('📂 Estado carregado do Firebase');
+            
+            // Validar estrutura básica
+            if (!stateData.appState || !stateData.analysts) {
+                console.error('❌ Estrutura de estado inválida');
+                return null;
+            }
+            
+            console.log('📂 Estado carregado do Firebase:', {
+                version: stateData.version,
+                tickets: stateData.appState.ticketsToday || 0,
+                analysts: stateData.analysts.length || 0
+            });
             
             return stateData;
             
         } catch (error) {
             console.error('❌ Erro ao carregar estado:', error);
-            return this.loadFromLocalStorage('full_state');
+            return null;
         }
     }
 
@@ -227,7 +235,7 @@ class FirebaseAppIntegration {
                 synced: true
             };
 
-            // SALVAR no Firebase - usando set() em vez de add()
+            // SALVAR no Firebase
             const ticketRef = this.db.collection('tickets').doc(ticketId);
             await ticketRef.set(ticketData);
             
@@ -415,31 +423,6 @@ class FirebaseAppIntegration {
         return sessionId;
     }
 
-    saveToLocalStorage(key, data) {
-        try {
-            localStorage.setItem(`firebase_${key}`, JSON.stringify({
-                data: data,
-                timestamp: new Date().toISOString(),
-                synced: false
-            }));
-        } catch (error) {
-            console.error('❌ Erro ao salvar localmente:', error);
-        }
-    }
-
-    loadFromLocalStorage(key) {
-        try {
-            const saved = localStorage.getItem(`firebase_${key}`);
-            if (!saved) return null;
-            
-            const parsed = JSON.parse(saved);
-            return parsed.data;
-        } catch (error) {
-            console.error('❌ Erro ao carregar localmente:', error);
-            return null;
-        }
-    }
-
     saveTicketLocally(ticketNumber, analystName, status, clientType) {
         try {
             const tickets = JSON.parse(localStorage.getItem('offline_tickets') || '[]');
@@ -559,24 +542,6 @@ class FirebaseAppIntegration {
             console.error('❌ Erro ao gerar CSV:', error);
             return false;
         }
-    }
-
-    updateLastSavedUI() {
-        const element = document.getElementById('lastSaved');
-        if (!element) return;
-        
-        element.style.display = 'inline-block';
-        const time = new Date().toLocaleTimeString('pt-BR', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            second: '2-digit'
-        });
-        element.querySelector('span').textContent = `Salvo: ${time}`;
-        
-        // Esconder após 5 segundos
-        setTimeout(() => {
-            element.style.display = 'none';
-        }, 5000);
     }
 
     isInitialized() {
