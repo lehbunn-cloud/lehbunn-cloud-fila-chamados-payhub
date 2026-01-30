@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Portal Payhub</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
+    <!-- Estilos -->
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        .dashboard-container {
+            padding: 20px;
+        }
+        
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .admin-welcome {
+            font-size: 18px;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logout-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background: #d32f2f;
+            transform: translateY(-2px);
+        }
+        
+        .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .admin-stat-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
+        }
+        
+        .admin-stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .admin-stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .admin-stat-card .label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .admin-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .admin-action-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .admin-action-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+            border-color: #667eea;
+        }
+        
+        .admin-action-card i {
+            font-size: 40px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .admin-action-card h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #212529;
+            margin-bottom: 10px;
+        }
+        
+        .admin-action-card p {
+            font-size: 14px;
+            color: #6c757d;
+            line-height: 1.5;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #6c757d;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .close-modal:hover {
+            background: #f8f9fa;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-actions {
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+        }
+        
+        .quick-assign-section {
+            margin-top: 30px;
+        }
+        
+        .analyst-select-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .analyst-select-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .analyst-select-card:hover {
+            border-color: #667eea;
+            background: white;
+        }
+        
+        .analyst-select-card.selected {
+            border-color: #4CAF50;
+            background: #E8F5E9;
+        }
+        
+        .analyst-select-card h4 {
+            margin-bottom: 5px;
+            color: #212529;
+        }
+        
+        .analyst-select-card small {
+            color: #6c757d;
+            font-size: 12px;
+        }
+        
+        @media (max-width: 768px) {
+            .admin-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .admin-actions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .modal-content {
+                margin: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Overlay de autenticação -->
+    <div id="authOverlay" class="modal-overlay" style="display: flex;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-lock"></i>
+                    Verificação de Acesso
+                </div>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 40px 20px;">
+                <div class="loading-spinner-large" style="margin-bottom: 20px;"></div>
+                <h3 style="margin-bottom: 10px;">Verificando autenticação...</h3>
+                <p style="color: #6c757d;">Aguarde enquanto verificamos suas credenciais.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para adicionar ticket -->
+    <div id="addTicketModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-plus-circle"></i>
+                    Adicionar Novo Ticket
+                </div>
+                <button class="close-modal" id="closeTicketModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="ticketNumber">
+                        <i class="fas fa-hashtag"></i>
+                        Número do Ticket
+                    </label>
+                    <input type="text" 
+                           id="ticketNumber" 
+                           class="input-field" 
+                           placeholder="Ex: 1234"
+                           autocomplete="off">
+                </div>
+                
+                <div class="form-group">
+                    <label for="ticketType">
+                        <i class="fas fa-star"></i>
+                        Tipo de Cliente
+                    </label>
+                    <select id="ticketType" class="input-field">
+                        <option value="normal">Cliente Normal</option>
+                        <option value="TIM">Cliente TIM (Eric)</option>
+                        <option value="DPSP">Cliente DPSP (Felipe)</option>
+                        <option value="Benoit">Cliente Benoit (André)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="assignTo">
+                        <i class="fas fa-user"></i>
+                        Atribuir para
+                    </label>
+                    <select id="assignTo" class="input-field">
+                        <option value="queue">Adicionar à Fila de Espera</option>
+                        <!-- Opções serão preenchidas dinamicamente -->
+                    </select>
+                </div>
+                
+                <div id="analystStatusInfo" style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-top: 15px; display: none;">
+                    <div style="font-weight: 500; margin-bottom: 5px;">Status do Analista:</div>
+                    <div id="selectedAnalystStatus" style="font-size: 14px; color: #6c757d;"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="cancelAddTicket">Cancelar</button>
+                <button class="btn btn-success" id="confirmAddTicket">
+                    <i class="fas fa-plus"></i>
+                    Adicionar Ticket
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Container principal -->
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <h1>
+                    <i class="fas fa-cogs"></i>
+                    Painel Administrativo
+                    <span class="version-badge">v3.5.0</span>
+                </h1>
+                <p>Controle completo do sistema de fila de chamados</p>
+            </div>
+            <div id="firebaseStatus" class="firebase-status">
+                <i class="fas fa-circle"></i>
+                <span>Conectando...</span>
+            </div>
+        </div>
+        
+        <div class="nav-menu">
+            <a href="admin-dashboard.html" class="nav-link active">
+                <i class="fas fa-tachometer-alt"></i>
+                Dashboard
+            </a>
+            <a href="analyst-view.html" target="_blank" class="nav-link">
+                <i class="fas fa-eye"></i>
+                Visualização Pública
+            </a>
+            <a href="admin-tools.html" class="nav-link">
+                <i class="fas fa-tools"></i>
+                Ferramentas Admin
+            </a>
+        </div>
+        
+        <div class="dashboard-container">
+            <!-- Cabeçalho do admin -->
+            <div class="admin-header">
+                <div class="admin-welcome">
+                    <i class="fas fa-user-shield"></i>
+                    <span>Bem-vindo, <strong id="adminUsername">Administrador</strong></span>
+                </div>
+                <button class="logout-btn" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Sair
+                </button>
+            </div>
+            
+            <!-- Estatísticas rápidas -->
+            <div class="admin-stats">
+                <div class="admin-stat-card">
+                    <div class="value" id="statTicketsToday">0</div>
+                    <div class="label">Chamados Hoje</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="value" id="statAvailableAnalysts">0</div>
+                    <div class="label">Analistas Disponíveis</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="value" id="statBusyAnalysts">0</div>
+                    <div class="label">Em Atendimento</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="value" id="statWaitingQueue">0</div>
+                    <div class="label">Na Fila de Espera</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="value" id="statSpecialClients">0</div>
+                    <div class="label">Clientes Especiais</div>
+                </div>
+            </div>
+            
+            <!-- Ações rápidas -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-bolt"></i>
+                    Ações Rápidas
+                </div>
+                <div class="admin-actions-grid">
+                    <div class="admin-action-card" id="addTicketBtn">
+                        <i class="fas fa-plus-circle"></i>
+                        <h3>Adicionar Ticket</h3>
+                        <p>Adicione um novo ticket à fila ou atribua diretamente a um analista</p>
+                    </div>
+                    
+                    <div class="admin-action-card" id="advanceQueueBtn">
+                        <i class="fas fa-forward"></i>
+                        <h3>Avançar Fila</h3>
+                        <p>Atribuir próximo ticket da fila de espera a um analista disponível</p>
+                    </div>
+                    
+                    <div class="admin-action-card" id="finishTicketBtn">
+                        <i class="fas fa-check-circle"></i>
+                        <h3>Finalizar Ticket</h3>
+                        <p>Finalize um ticket em andamento e libere o analista</p>
+                    </div>
+                    
+                    <div class="admin-action-card" id="resetDayBtn">
+                        <i class="fas fa-redo-alt"></i>
+                        <h3>Reiniciar Dia</h3>
+                        <p>Zere estatísticas e prepare o sistema para um novo dia</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Atribuição rápida de tickets especiais -->
+            <div class="card quick-assign-section">
+                <div class="card-title">
+                    <i class="fas fa-star"></i>
+                    Clientes Especiais - Atribuição Rápida
+                </div>
+                <div class="control-group">
+                    <input type="text" 
+                           id="specialTicketNumber" 
+                           class="input-field" 
+                           placeholder="Número do ticket especial"
+                           autocomplete="off">
+                    <select id="specialClientType" class="input-field">
+                        <option value="TIM">Cliente TIM (Eric)</option>
+                        <option value="DPSP">Cliente DPSP (Felipe)</option>
+                        <option value="Benoit">Cliente Benoit (André)</option>
+                    </select>
+                    
+                    <div class="analyst-select-grid" id="availableAnalystsGrid">
+                        <!-- Analistas disponíveis serão carregados aqui -->
+                        <div class="loading">
+                            <div class="loading-spinner"></div>
+                            <span>Carregando analistas disponíveis...</span>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button class="btn btn-success" id="assignSpecialBtn" style="padding: 12px 30px;">
+                            <i class="fas fa-user-check"></i>
+                            Atribuir Cliente Especial
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status em tempo real -->
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Status em Tempo Real
+                </div>
+                <div id="realTimeStatus" style="padding: 20px;">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <span>Carregando status do sistema...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Portal Payhub - Painel Administrativo</strong> | v3.5.0</p>
+            <p>Última atualização: <span id="lastUpdate">--:--:--</span></p>
+            <p class="last-reset">Acesso restrito a administradores autorizados</p>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <!-- Scripts -->
+    <script src="firebase-config.js"></script>
+    <script src="firebase-app.js"></script>
+    <script>
+  // VERIFICAÇÃO DE AUTENTICAÇÃO SIMPLES E EFETIVA
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DASHBOARD INICIALIZANDO ===');
+    
+    const authOverlay = document.getElementById('authOverlay');
+    
+    // Verificação SIMPLES
+    function checkAuth() {
+        console.log('🔍 Verificando autenticação...');
+        
+        // Verificar em localStorage (principal) e sessionStorage (backup)
+        const localAuth = localStorage.getItem('admin_auth') === 'true';
+        const sessionAuth = sessionStorage.getItem('admin_auth') === 'true';
+        
+        const authTime = parseInt(localStorage.getItem('admin_time') || sessionStorage.getItem('admin_time') || '0');
+        const currentTime = Date.now();
+        const hoursDiff = (currentTime - authTime) / (1000 * 60 * 60);
+        
+        console.log('Status auth:', {
+            local: localAuth,
+            session: sessionAuth,
+            hoursDiff: hoursDiff.toFixed(2),
+            authTime: new Date(authTime).toLocaleString()
+        });
+        
+        // Se não autenticado ou sessão expirou (> 8 horas)
+        if ((!localAuth && !sessionAuth) || hoursDiff > 8) {
+            console.log('❌ Não autenticado ou sessão expirada');
+            
+            // Limpar tudo
+            localStorage.removeItem('admin_auth');
+            localStorage.removeItem('admin_user');
+            localStorage.removeItem('admin_time');
+            
+            sessionStorage.removeItem('admin_auth');
+            sessionStorage.removeItem('admin_user');
+            sessionStorage.removeItem('admin_time');
+            
+            // Redirecionar para login
+            window.location.href = 'login.html';
+            return false;
+        }
+        
+        console.log('✅ Autenticado!');
+        return true;
+    }
+    
+    // EXECUTAR VERIFICAÇÃO
+    if (!checkAuth()) {
+        console.log('⛔ Dashboard não carregado - Usuário não autenticado');
+        return;
+    }
+    
+    console.log('✅ Dashboard sendo carregado...');
+    
+    // Esconder overlay
+    setTimeout(() => {
+        if (authOverlay) {
+            authOverlay.style.display = 'none';
+        }
+        
+        // Carregar nome do admin
+        const adminUser = localStorage.getItem('admin_user') || 
+                         sessionStorage.getItem('admin_user') || 
+                         'Administrador';
+        document.getElementById('adminUsername').textContent = adminUser;
+        
+        // Continuar carregamento normal
+        try {
+            loadDashboard();
+            setupEventListeners();
+            setInterval(loadDashboard, 10000);
+            console.log('✅ Dashboard completamente carregado');
+        } catch (error) {
+            console.error('Erro ao carregar dashboard:', error);
+        }
+    }, 300);
+});
+        
+        function loadDashboard() {
+            try {
+                console.log('Carregando dashboard...');
+                
+                // Carregar estado do sistema
+                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                const savedAnalysts = savedState.analysts || [];
+                const appState = savedState.appState || {};
+                const queueOrder = savedState.queueOrder || [];
+                
+                // Mesclar dados dos analistas
+                const baseAnalysts = [
+                    { id: 1, name: "Analista 01", level: "N1", startTime: 8, endTime: 17 },
+                    { id: 2, name: "Analista 02", level: "N1", startTime: 8, endTime: 17 },
+                    { id: 3, name: "Analista 03", level: "N1", startTime: 8, endTime: 17 },
+                    { id: 4, name: "Analista 04", level: "N2", startTime: 9, endTime: 18 },
+                    { id: 5, name: "Analista 05", level: "N2", startTime: 9, endTime: 18 },
+                    { id: 6, name: "Analista 06", level: "N2", startTime: 9, endTime: 18 },
+                    { id: 7, name: "Analista 07", level: "N3", startTime: 10, endTime: 19 },
+                    { id: 8, name: "Analista 08", level: "N3", startTime: 10, endTime: 19 },
+                    { id: 9, name: "Analista 09", level: "N3", startTime: 10, endTime: 19 }
+                ];
+                
+                const analysts = baseAnalysts.map(baseAnalyst => {
+                    const savedAnalyst = savedAnalysts.find(a => a.id === baseAnalyst.id);
+                    return {
+                        ...baseAnalyst,
+                        isAvailable: savedAnalyst?.isAvailable || false,
+                        isBusy: savedAnalyst?.isBusy || false,
+                        currentTicket: savedAnalyst?.currentTicket || null,
+                        ticketStatus: savedAnalyst?.ticketStatus || null,
+                        ticketSpecialType: savedAnalyst?.ticketSpecialType || null,
+                        ticketsHandled: savedAnalyst?.ticketsHandled || 0,
+                        isWaitingForClient: savedAnalyst?.isWaitingForClient || false,
+                        lastActivity: savedAnalyst?.lastActivity || null,
+                        specialClient: savedAnalyst?.specialClient || null,
+                        inQueue: savedAnalyst?.inQueue !== undefined ? savedAnalyst.inQueue : baseAnalyst.level === "N1"
+                    };
+                });
+                
+                // Atualizar estatísticas
+                updateDashboardStats(analysts, appState, queueOrder);
+                
+                // Atualizar grid de analistas disponíveis
+                updateAvailableAnalystsGrid(analysts);
+                
+                // Atualizar status em tempo real
+                updateRealTimeStatus(analysts, queueOrder);
+                
+                // Atualizar hora
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('pt-BR');
+                
+                // Atualizar status Firebase
+                updateFirebaseStatus();
+                
+            } catch (error) {
+                console.error('Erro ao carregar dashboard:', error);
+                showNotification('Erro ao carregar dados do sistema', 'error');
+            }
+        }
+        
+        function updateDashboardStats(analysts, appState, queueOrder) {
+            const ticketsToday = appState.ticketsToday || 0;
+            const availableAnalysts = analysts.filter(a => a.isAvailable && !a.isBusy).length;
+            const busyAnalysts = analysts.filter(a => a.isBusy).length;
+            const waitingQueue = queueOrder.length;
+            const specialClients = analysts.filter(a => a.specialClient && a.isBusy).length;
+            
+            document.getElementById('statTicketsToday').textContent = ticketsToday;
+            document.getElementById('statAvailableAnalysts').textContent = availableAnalysts;
+            document.getElementById('statBusyAnalysts').textContent = busyAnalysts;
+            document.getElementById('statWaitingQueue').textContent = waitingQueue;
+            document.getElementById('statSpecialClients').textContent = specialClients;
+        }
+        
+        function updateAvailableAnalystsGrid(analysts) {
+            const grid = document.getElementById('availableAnalystsGrid');
+            if (!grid) return;
+            
+            const availableAnalysts = analysts.filter(a => a.isAvailable && !a.isBusy);
+            
+            if (availableAnalysts.length === 0) {
+                grid.innerHTML = '<div class="empty-state">Nenhum analista disponível no momento</div>';
+                return;
+            }
+            
+            let html = '';
+            availableAnalysts.forEach(analyst => {
+                html += `
+                    <div class="analyst-select-card" data-analyst-id="${analyst.id}">
+                        <h4>${analyst.name}</h4>
+                        <small>${analyst.level} • ${analyst.ticketsHandled || 0} tickets hoje</small>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+            
+            // Adicionar event listeners para seleção
+            document.querySelectorAll('.analyst-select-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    document.querySelectorAll('.analyst-select-card').forEach(c => {
+                        c.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
+                });
+            });
+        }
+        
+        function updateRealTimeStatus(analysts, queueOrder) {
+            const container = document.getElementById('realTimeStatus');
+            if (!container) return;
+            
+            // Analistas ocupados
+            const busyAnalysts = analysts.filter(a => a.isBusy);
+            const waitingClients = analysts.filter(a => a.isWaitingForClient);
+            
+            let html = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div style="font-weight: 500; margin-bottom: 10px; color: #212529;">
+                            <i class="fas fa-user-clock"></i> Em Atendimento (${busyAnalysts.length})
+                        </div>
+            `;
+            
+            if (busyAnalysts.length === 0) {
+                html += '<div style="color: #6c757d; font-style: italic;">Nenhum analista em atendimento</div>';
+            } else {
+                busyAnalysts.forEach(analyst => {
+                    const waitingText = analyst.isWaitingForClient ? '⏳ Aguardando cliente' : '✅ Ativo';
+                    html += `
+                        <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+                            <div style="font-weight: 500;">${analyst.name}</div>
+                            <div style="font-size: 12px; color: #6c757d;">
+                                Ticket: ${analyst.currentTicket || 'N/A'} • ${waitingText}
+                                ${analyst.specialClient ? `<br><span style="color: #ff9800;">${analyst.specialClient}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            html += `
+                    </div>
+                    <div>
+                        <div style="font-weight: 500; margin-bottom: 10px; color: #212529;">
+                            <i class="fas fa-list-ol"></i> Fila de Espera (${queueOrder.length})
+                        </div>
+            `;
+            
+            if (queueOrder.length === 0) {
+                html += '<div style="color: #6c757d; font-style: italic;">Fila vazia</div>';
+            } else {
+                queueOrder.slice(0, 5).forEach((ticket, index) => {
+                    html += `
+                        <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+                            <div style="font-weight: 500;">Ticket #${ticket.number}</div>
+                            <div style="font-size: 12px; color: #6c757d;">
+                                Posição: ${index + 1} • ${ticket.type || 'Normal'}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                if (queueOrder.length > 5) {
+                    html += `<div style="font-size: 12px; color: #6c757d; margin-top: 5px;">
+                                +${queueOrder.length - 5} tickets na fila
+                            </div>`;
+                }
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+        
+        function setupEventListeners() {
+            // Logout
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                if (confirm('Deseja realmente sair do painel administrativo?')) {
+                    sessionStorage.removeItem('admin_authenticated');
+                    sessionStorage.removeItem('admin_username');
+                    sessionStorage.removeItem('admin_login_time');
+                    window.location.href = 'login.html';
+                }
+            });
+            
+            // Adicionar ticket
+            document.getElementById('addTicketBtn').addEventListener('click', showAddTicketModal);
+            document.getElementById('closeTicketModal').addEventListener('click', hideAddTicketModal);
+            document.getElementById('cancelAddTicket').addEventListener('click', hideAddTicketModal);
+            document.getElementById('confirmAddTicket').addEventListener('click', addNewTicket);
+            
+            // Avançar fila
+            document.getElementById('advanceQueueBtn').addEventListener('click', advanceQueue);
+            
+            // Finalizar ticket
+            document.getElementById('finishTicketBtn').addEventListener('click', showFinishTicketModal);
+            
+            // Reiniciar dia
+            document.getElementById('resetDayBtn').addEventListener('click', resetDay);
+            
+            // Atribuir cliente especial
+            document.getElementById('assignSpecialBtn').addEventListener('click', assignSpecialClient);
+        }
+        
+        function showAddTicketModal() {
+            const modal = document.getElementById('addTicketModal');
+            modal.style.display = 'flex';
+            
+            // Limpar campos
+            document.getElementById('ticketNumber').value = '';
+            
+            // Carregar analistas disponíveis para o select
+            loadAvailableAnalystsForSelect();
+            
+            // Focar no campo de número
+            setTimeout(() => {
+                document.getElementById('ticketNumber').focus();
+            }, 100);
+        }
+        
+        function hideAddTicketModal() {
+            document.getElementById('addTicketModal').style.display = 'none';
+        }
+        
+        function loadAvailableAnalystsForSelect() {
+            const select = document.getElementById('assignTo');
+            select.innerHTML = '<option value="queue">Adicionar à Fila de Espera</option>';
+            
+            // Carregar analistas disponíveis
+            const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
+            const savedAnalysts = savedState.analysts || [];
+            
+            const baseAnalysts = [
+                { id: 1, name: "Analista 01", level: "N1" },
+                { id: 2, name: "Analista 02", level: "N1" },
+                { id: 3, name: "Analista 03", level: "N1" },
+                { id: 4, name: "Analista 04", level: "N2" },
+                { id: 5, name: "Analista 05", level: "N2" },
+                { id: 6, name: "Analista 06", level: "N2" },
+                { id: 7, name: "Analista 07", level: "N3" },
+                { id: 8, name: "Analista 08", level: "N3" },
+                { id: 9, name: "Analista 09", level: "N3" }
+            ];
+            
+            const analysts = baseAnalysts.map(baseAnalyst => {
+                const savedAnalyst = savedAnalysts.find(a => a.id === baseAnalyst.id);
+                return {
+                    ...baseAnalyst,
+                    isAvailable: savedAnalyst?.isAvailable || false,
+                    isBusy: savedAnalyst?.isBusy || false
+                };
+            });
+            
+            const availableAnalysts = analysts.filter(a => a.isAvailable && !a.isBusy);
+            
+            availableAnalysts.forEach(analyst => {
+                const option = document.createElement('option');
+                option.value = analyst.id;
+                option.textContent = `${analyst.name} (${analyst.level})`;
+                select.appendChild(option);
+            });
+            
+            // Atualizar info quando selecionar analista
+            select.addEventListener('change', function() {
+                const analystId = this.value;
+                const infoDiv = document.getElementById('analystStatusInfo');
+                const statusDiv = document.getElementById('selectedAnalystStatus');
+                
+                if (analystId === 'queue') {
+                    infoDiv.style.display = 'none';
+                    return;
+                }
+                
+                const analyst = analysts.find(a => a.id === parseInt(analystId));
+                if (analyst) {
+                    infoDiv.style.display = 'block';
+                    statusDiv.innerHTML = `
+                        <strong>${analyst.name}</strong> (${analyst.level})<br>
+                        Status: Disponível • Tickets hoje: ${analyst.ticketsHandled || 0}
+                    `;
+                }
+            });
+        }
+        
+        function addNewTicket() {
+            const ticketNumber = document.getElementById('ticketNumber').value.trim();
+            const ticketType = document.getElementById('ticketType').value;
+            const assignTo = document.getElementById('assignTo').value;
+            
+            if (!ticketNumber) {
+                showNotification('Digite o número do ticket', 'error');
+                return;
+            }
+            
+            try {
+                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                const appState = savedState.appState || {};
+                const queueOrder = savedState.queueOrder || [];
+                const savedAnalysts = savedState.analysts || [];
+                
+                // Atualizar contador de tickets
+                appState.ticketsToday = (appState.ticketsToday || 0) + 1;
+                
+                if (assignTo === 'queue') {
+                    // Adicionar à fila de espera
+                    queueOrder.push({
+                        number: ticketNumber,
+                        type: ticketType === 'normal' ? null : ticketType,
+                        addedAt: new Date().toISOString()
+                    });
+                    
+                    showNotification(`Ticket #${ticketNumber} adicionado à fila de espera`, 'success');
+                } else {
+                    // Atribuir diretamente a um analista
+                    const analystId = parseInt(assignTo);
+                    const analystIndex = savedAnalysts.findIndex(a => a.id === analystId);
+                    
+                    if (analystIndex !== -1) {
+                        savedAnalysts[analystIndex].isBusy = true;
+                        savedAnalysts[analystIndex].currentTicket = ticketNumber;
+                        savedAnalysts[analystIndex].ticketStatus = 'Em atendimento';
+                        savedAnalysts[analystIndex].ticketSpecialType = ticketType === 'normal' ? null : ticketType;
+                        savedAnalysts[analystIndex].specialClient = ticketType === 'normal' ? null : ticketType;
+                        savedAnalysts[analystIndex].lastActivity = new Date().toISOString();
+                        savedAnalysts[analystIndex].ticketsHandled = (savedAnalysts[analystIndex].ticketsHandled || 0) + 1;
+                        
+                        // Salvar no Firebase se disponível
+                        if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+                            window.firebaseAppIntegration.saveTicketToFirebase(
+                                ticketNumber,
+                                savedAnalysts[analystIndex].name,
+                                'iniciado',
+                                ticketType === 'normal' ? 'normal' : 'especial'
+                            );
+                        }
+                        
+                        showNotification(`Ticket #${ticketNumber} atribuído ao analista`, 'success');
+                    }
+                }
+                
+                // Salvar estado atualizado
+                savedState.appState = appState;
+                savedState.queueOrder = queueOrder;
+                savedState.analysts = savedAnalysts;
+                savedState.lastUpdate = new Date().toISOString();
+                
+                localStorage.setItem('queue_state', JSON.stringify(savedState));
+                
+                // Fechar modal e atualizar dashboard
+                hideAddTicketModal();
+                loadDashboard();
+                
+            } catch (error) {
+                console.error('Erro ao adicionar ticket:', error);
+                showNotification('Erro ao adicionar ticket', 'error');
+            }
+        }
+        
+        function advanceQueue() {
+            try {
+                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                const queueOrder = savedState.queueOrder || [];
+                const savedAnalysts = savedState.analysts || [];
+                
+                if (queueOrder.length === 0) {
+                    showNotification('Não há tickets na fila de espera', 'warning');
+                    return;
+                }
+                
+                // Encontrar primeiro analista disponível
+                const availableAnalyst = savedAnalysts.find(a => a.isAvailable && !a.isBusy);
+                
+                if (!availableAnalyst) {
+                    showNotification('Não há analistas disponíveis no momento', 'warning');
+                    return;
+                }
+                
+                // Remover primeiro ticket da fila
+                const nextTicket = queueOrder.shift();
+                const analystIndex = savedAnalysts.findIndex(a => a.id === availableAnalyst.id);
+                
+                if (analystIndex !== -1) {
+                    // Atribuir ticket ao analista
+                    savedAnalysts[analystIndex].isBusy = true;
+                    savedAnalysts[analystIndex].currentTicket = nextTicket.number;
+                    savedAnalysts[analystIndex].ticketStatus = 'Em atendimento';
+                    savedAnalysts[analystIndex].ticketSpecialType = nextTicket.type || null;
+                    savedAnalysts[analystIndex].specialClient = nextTicket.type || null;
+                    savedAnalysts[analystIndex].lastActivity = new Date().toISOString();
+                    savedAnalysts[analystIndex].ticketsHandled = (savedAnalysts[analystIndex].ticketsHandled || 0) + 1;
+                    
+                    // Salvar no Firebase se disponível
+                    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+                        window.firebaseAppIntegration.saveTicketToFirebase(
+                            nextTicket.number,
+                            savedAnalysts[analystIndex].name,
+                            'iniciado',
+                            nextTicket.type ? 'especial' : 'normal'
+                        );
+                    }
+                    
+                    // Atualizar estado
+                    savedState.queueOrder = queueOrder;
+                    savedState.analysts = savedAnalysts;
+                    savedState.lastUpdate = new Date().toISOString();
+                    
+                    localStorage.setItem('queue_state', JSON.stringify(savedState));
+                    
+                    showNotification(`Ticket #${nextTicket.number} atribuído a ${savedAnalysts[analystIndex].name}`, 'success');
+                    loadDashboard();
+                }
+                
+            } catch (error) {
+                console.error('Erro ao avançar fila:', error);
+                showNotification('Erro ao avançar fila', 'error');
+            }
+        }
+        
+        function showFinishTicketModal() {
+            // Criar modal dinâmico para finalizar tickets
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title">
+                            <i class="fas fa-check-circle"></i>
+                            Finalizar Ticket
+                        </div>
+                        <button class="close-modal" id="closeFinishModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="busyAnalystsList">
+                            <div class="loading">
+                                <div class="loading-spinner"></div>
+                                <span>Carregando analistas ocupados...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn" id="cancelFinish">Cancelar</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Carregar analistas ocupados
+            setTimeout(() => {
+                loadBusyAnalystsForFinish();
+            }, 100);
+            
+            // Event listeners
+            modal.querySelector('#closeFinishModal').addEventListener('click', () => modal.remove());
+            modal.querySelector('#cancelFinish').addEventListener('click', () => modal.remove());
+        }
+        
+        function loadBusyAnalystsForFinish() {
+            const container = document.querySelector('#busyAnalystsList');
+            if (!container) return;
+            
+            try {
+                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                const savedAnalysts = savedState.analysts || [];
+                
+                const busyAnalysts = savedAnalysts.filter(a => a.isBusy);
+                
+                if (busyAnalysts.length === 0) {
+                    container.innerHTML = '<div class="empty-state">Nenhum analista com ticket ativo</div>';
+                    return;
+                }
+                
+                let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+                busyAnalysts.forEach(analyst => {
+                    html += `
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 500;">${analyst.name}</div>
+                                <div style="font-size: 12px; color: #6c757d;">
+                                    Ticket: ${analyst.currentTicket || 'N/A'}
+                                    ${analyst.specialClient ? ` • ${analyst.specialClient}` : ''}
+                                </div>
+                            </div>
+                            <button class="btn btn-success btn-small finish-ticket-btn" data-analyst-id="${analyst.id}">
+                                <i class="fas fa-check"></i>
+                                Finalizar
+                            </button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                
+                container.innerHTML = html;
+                
+                // Adicionar event listeners aos botões
+                document.querySelectorAll('.finish-ticket-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const analystId = parseInt(this.getAttribute('data-analyst-id'));
+                        finishTicket(analystId);
+                        this.closest('.modal-overlay').remove();
+                    });
+                });
+                
+            } catch (error) {
+                console.error('Erro ao carregar analistas:', error);
+                container.innerHTML = '<div class="empty-state">Erro ao carregar analistas</div>';
+            }
+        }
+        
+        function finishTicket(analystId) {
+            try {
+                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                const savedAnalysts = savedState.analysts || [];
+                const analystIndex = savedAnalysts.findIndex(a => a.id === analystId);
+                
+                if (analystIndex === -1) {
+                    showNotification('Analista não encontrado', 'error');
+                    return;
+                }
+                
+                const analyst = savedAnalysts[analystIndex];
+                const ticketNumber = analyst.currentTicket;
+                
+                // Atualizar status do analista
+                savedAnalysts[analystIndex].isBusy = false;
+                savedAnalysts[analystIndex].currentTicket = null;
+                savedAnalysts[analystIndex].ticketStatus = null;
+                savedAnalysts[analystIndex].ticketSpecialType = null;
+                savedAnalysts[analystIndex].isWaitingForClient = false;
+                savedAnalysts[analystIndex].specialClient = null;
+                savedAnalysts[analystIndex].lastActivity = new Date().toISOString();
+                
+                // Atualizar estado
+                savedState.analysts = savedAnalysts;
+                savedState.lastUpdate = new Date().toISOString();
+                
+                localStorage.setItem('queue_state', JSON.stringify(savedState));
+                
+                // Atualizar no Firebase se disponível
+                if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized && ticketNumber) {
+                    window.firebaseAppIntegration.updateTicketStatus(
+                        ticketNumber,
+                        'finalizado',
+                        analyst.name
+                    );
+                }
+                
+                showNotification(`Ticket #${ticketNumber} finalizado`, 'success');
+                loadDashboard();
+                
+            } catch (error) {
+                console.error('Erro ao finalizar ticket:', error);
+                showNotification('Erro ao finalizar ticket', 'error');
+            }
+        }
+        
+        function resetDay() {
+            if (!confirm('Deseja realmente reiniciar o dia?\n\nEsta ação irá:\n• Zerar todas as estatísticas\n• Limpar a fila de espera\n• Liberar todos os analistas\n• Manter apenas os dados históricos')) {
+                return;
+            }
+            
+            try {
+                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                const baseAnalysts = [
+                    { id: 1, name: "Analista 01", level: "N1", startTime: 8, endTime: 17 },
+                    { id: 2, name: "Analista 02", level: "N1", startTime: 8, endTime: 17 },
+                    { id: 3, name: "Analista 03", level: "N1", startTime: 8, endTime: 17 },
+                    { id: 4, name: "Analista 04", level: "N2", startTime: 9, endTime: 18 },
+                    { id: 5, name: "Analista 05", level: "N2", startTime: 9, endTime: 18 },
+                    { id: 6, name: "Analista 06", level: "N2", startTime: 9, endTime: 18 },
+                    { id: 7, name: "Analista 07", level: "N3", startTime: 10, endTime: 19 },
+                    { id: 8, name: "Analista 08", level: "N3", startTime: 10, endTime: 19 },
+                    { id: 9, name: "Analista 09", level: "N3", startTime: 10, endTime: 19 }
+                ];
+                
+                // Resetar estado
+                const resetState = {
+                    appState: {
+                        ticketsToday: 0,
+                        specialTicketsToday: 0,
+                        waitingTicketsToday: 0,
+                        lastReset: new Date().toLocaleDateString('pt-BR'),
+                        nextTicketNumber: 1000
+                    },
+                    analysts: baseAnalysts.map(a => ({
+                        id: a.id,
+                        name: a.name,
+                        level: a.level,
+                        startTime: a.startTime,
+                        endTime: a.endTime,
+                        isAvailable: false,
+                        isBusy: false,
+                        currentTicket: null,
+                        ticketStatus: null,
+                        ticketSpecialType: null,
+                        ticketsHandled: 0,
+                        isWaitingForClient: false,
+                        inQueue: a.level === "N1",
+                        lastActivity: null,
+                        specialClient: null
+                    })),
+                    queueOrder: [],
+                    version: '3.5.0',
+                    resetTime: new Date().toISOString(),
+                    lastUpdate: new Date().toISOString()
+                };
+                
+                // Preservar dados históricos se existirem
+                if (savedState.history) {
+                    resetState.history = savedState.history;
+                }
+                
+                localStorage.setItem('queue_state', JSON.stringify(resetState));
+                
+                showNotification('Dia reiniciado com sucesso!', 'success');
+                loadDashboard();
+                
+            } catch (error) {
+                console.error('Erro ao reiniciar dia:', error);
+                showNotification('Erro ao reiniciar dia', 'error');
+            }
+        }
+        
+        function assignSpecialClient() {
+            const ticketNumber = document.getElementById('specialTicketNumber').value.trim();
+            const clientType = document.getElementById('specialClientType').value;
+            const selectedAnalystCard = document.querySelector('.analyst-select-card.selected');
+            
+            if (!ticketNumber) {
+                showNotification('Digite o número do ticket', 'error');
+                return;
+            }
+            
+            if (!selectedAnalystCard) {
+                showNotification('Selecione um analista disponível', 'error');
+                return;
+            }
+            
+            const analystId = parseInt(selectedAnalystCard.getAttribute('data-analyst-id'));
+            
+            try {
+                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                const savedAnalysts = savedState.analysts || [];
+                const appState = savedState.appState || {};
+                
+                const analystIndex = savedAnalysts.findIndex(a => a.id === analystId);
+                
+                if (analystIndex === -1) {
+                    showNotification('Analista não encontrado', 'error');
+                    return;
+                }
+                
+                // Verificar se analista está disponível
+                if (savedAnalysts[analystIndex].isBusy) {
+                    showNotification('Este analista já está ocupado', 'warning');
+                    return;
+                }
+                
+                // Atualizar analista
+                savedAnalysts[analystIndex].isBusy = true;
+                savedAnalysts[analystIndex].currentTicket = ticketNumber;
+                savedAnalysts[analystIndex].ticketStatus = 'Em atendimento';
+                savedAnalysts[analystIndex].ticketSpecialType = clientType;
+                savedAnalysts[analystIndex].specialClient = clientType;
+                savedAnalysts[analystIndex].lastActivity = new Date().toISOString();
+                savedAnalysts[analystIndex].ticketsHandled = (savedAnalysts[analystIndex].ticketsHandled || 0) + 1;
+                
+                // Atualizar estatísticas
+                appState.ticketsToday = (appState.ticketsToday || 0) + 1;
+                appState.specialTicketsToday = (appState.specialTicketsToday || 0) + 1;
+                
+                // Salvar estado
+                savedState.appState = appState;
+                savedState.analysts = savedAnalysts;
+                savedState.lastUpdate = new Date().toISOString();
+                
+                localStorage.setItem('queue_state', JSON.stringify(savedState));
+                
+                // Salvar no Firebase se disponível
+                if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+                    window.firebaseAppIntegration.saveTicketToFirebase(
+                        ticketNumber,
+                        savedAnalysts[analystIndex].name,
+                        'iniciado',
+                        'especial'
+                    );
+                }
+                
+                // Limpar campos
+                document.getElementById('specialTicketNumber').value = '';
+                document.querySelectorAll('.analyst-select-card').forEach(c => {
+                    c.classList.remove('selected');
+                });
+                
+                showNotification(`Cliente especial ${clientType} atribuído com sucesso!`, 'success');
+                loadDashboard();
+                
+            } catch (error) {
+                console.error('Erro ao atribuir cliente especial:', error);
+                showNotification('Erro ao atribuir cliente especial', 'error');
+            }
+        }
+        
+        function updateFirebaseStatus() {
+            const statusElement = document.getElementById('firebaseStatus');
+            if (!statusElement) return;
+            
+            if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+                statusElement.innerHTML = '<i class="fas fa-plug"></i> Firebase Online';
+                statusElement.className = 'firebase-status connected';
+            } else if (window.firebaseApp && window.firebaseApp.isMock) {
+                statusElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Modo Offline';
+                statusElement.className = 'firebase-status disconnected';
+            } else {
+                statusElement.innerHTML = '<i class="fas fa-unlink"></i> Sem Conexão';
+                statusElement.className = 'firebase-status disconnected';
+            }
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Criar notificação
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 
+                                  type === 'error' ? 'exclamation-circle' : 
+                                  type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remover após 3 segundos
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
