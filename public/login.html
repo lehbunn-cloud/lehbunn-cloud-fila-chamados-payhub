@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="style.css">
     
     <style>
+        /* (Estilos mantidos iguais) */
         .login-section {
             min-height: 100vh;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -258,8 +259,6 @@
         </div>
     </div>
     
-    <!-- REMOVIDO: Firebase SDK duplicado -->
-    
     <!-- Scripts -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -271,10 +270,10 @@
             const togglePassword = document.getElementById('togglePassword');
             const passwordInput = document.getElementById('password');
             
-            // Credenciais de administrador (em produção, isso deve estar no Firebase Auth)
+            // Credenciais de administrador
             const ADMIN_CREDENTIALS = {
                 username: 'admin',
-                password: 'admin123' // Senha padrão - deve ser alterada
+                password: 'admin123'
             };
             
             // Alternar visibilidade da senha
@@ -284,12 +283,18 @@
                 this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
             });
             
-            // Processar login
-            loginForm.addEventListener('submit', function(e) {
+            // Processar login - CORRIGIDO
+            loginForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
-                const username = document.getElementById('username').value;
+                const username = document.getElementById('username').value.trim();
                 const password = document.getElementById('password').value;
+                
+                if (!username || !password) {
+                    errorText.textContent = 'Preencha todos os campos';
+                    loginError.classList.add('show');
+                    return;
+                }
                 
                 // Mostrar loading
                 loginBtn.disabled = true;
@@ -297,47 +302,83 @@
                 loginBtn.querySelector('span').textContent = 'Autenticando...';
                 loginError.classList.remove('show');
                 
-                // Simular delay para autenticação
-                setTimeout(() => {
-                    // Verificar credenciais
-                    if (username === ADMIN_CREDENTIALS.username && 
-                        password === ADMIN_CREDENTIALS.password) {
-                        
-                        // Login bem-sucedido
-                        sessionStorage.setItem('admin_authenticated', 'true');
-                        sessionStorage.setItem('admin_username', username);
-                        
-                        // Redirecionar para o painel administrativo
-                        window.location.href = 'admin-dashboard.html';
-                        
-                    } else {
-                        // Login falhou
-                        errorText.textContent = 'Usuário ou senha incorretos';
-                        loginError.classList.add('show');
-                        
-                        // Resetar botão
-                        loginBtn.disabled = false;
-                        loadingSpinner.style.display = 'none';
-                        loginBtn.querySelector('span').textContent = 'Entrar';
-                    }
-                }, 1000);
+                // Verificar credenciais com delay
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                // Verificar credenciais
+                if (username === ADMIN_CREDENTIALS.username && 
+                    password === ADMIN_CREDENTIALS.password) {
+                    
+                    // Login bem-sucedido
+                    sessionStorage.setItem('admin_authenticated', 'true');
+                    sessionStorage.setItem('admin_username', username);
+                    sessionStorage.setItem('admin_login_time', new Date().toISOString());
+                    
+                    console.log('✅ Login bem-sucedido, redirecionando...');
+                    
+                    // Redirecionar para o painel administrativo - CORRIGIDO
+                    // Usar caminho relativo para evitar Firebase Hosting
+                    const baseUrl = window.location.href.split('/').slice(0, -1).join('/');
+                    const redirectUrl = './admin-dashboard.html';
+                    
+                    // Forçar recarregamento completo
+                    window.location.href = redirectUrl;
+                    window.location.reload();
+                    
+                } else {
+                    // Login falhou
+                    errorText.textContent = 'Usuário ou senha incorretos';
+                    loginError.classList.add('show');
+                    
+                    // Resetar botão
+                    loginBtn.disabled = false;
+                    loadingSpinner.style.display = 'none';
+                    loginBtn.querySelector('span').textContent = 'Entrar';
+                    
+                    // Limpar campos
+                    document.getElementById('password').value = '';
+                    document.getElementById('username').focus();
+                    document.getElementById('username').select();
+                }
             });
             
             // Verificar se já está autenticado
-            if (sessionStorage.getItem('admin_authenticated') === 'true') {
-                window.location.href = 'admin-dashboard.html';
+            function checkAuthentication() {
+                const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+                const loginTime = sessionStorage.getItem('admin_login_time');
+                
+                if (isAuthenticated && loginTime) {
+                    // Verificar se a sessão expirou (4 horas)
+                    const loginDate = new Date(loginTime);
+                    const now = new Date();
+                    const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
+                    
+                    if (hoursDiff < 4) {
+                        console.log('✅ Sessão ativa, redirecionando...');
+                        window.location.href = './admin-dashboard.html';
+                    } else {
+                        // Sessão expirada
+                        sessionStorage.removeItem('admin_authenticated');
+                        sessionStorage.removeItem('admin_username');
+                        sessionStorage.removeItem('admin_login_time');
+                        console.log('⚠️ Sessão expirada');
+                    }
+                }
             }
+            
+            // Verificar autenticação ao carregar
+            checkAuthentication();
             
             // Focar no campo de usuário
             document.getElementById('username').focus();
             
-            // Verificar status do Firebase (apenas para exibição)
-            setTimeout(() => {
-                const firebaseApp = window.firebaseApp;
-                if (firebaseApp && !firebaseApp.isMock) {
-                    console.log('✅ Firebase já inicializado anteriormente');
-                }
-            }, 500);
+            // Log para debug
+            console.log('🔍 Login page loaded');
+            console.log('📍 Current URL:', window.location.href);
+            console.log('📁 Session storage:', {
+                authenticated: sessionStorage.getItem('admin_authenticated'),
+                username: sessionStorage.getItem('admin_username')
+            });
         });
     </script>
 </body>
