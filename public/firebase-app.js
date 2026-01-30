@@ -13,36 +13,81 @@ class FirebaseAppIntegration {
     }
 
     async init() {
-        try {
-            console.log('🔧 Inicializando Firebase App Integration...');
-            
-            // Aguardar configuração
-            await this.waitForConfig();
-            
-            const refs = window.firebaseConfig?.getFirebaseRefs();
-            if (!refs || !refs.db) {
-                throw new Error('Firebase não disponível');
-            }
-
-            this.db = refs.db;
-            this.auth = refs.auth;
-            this.initialized = true;
-            this.sessionId = this.getSessionId();
-            
-            console.log('✅ Firebase App Integration inicializado');
-            console.log('📝 Sessão:', this.sessionId);
-            
-            // Configurar persistência offline
-            this.setupPersistence();
-            
-            return true;
-            
-        } catch (error) {
-            console.error('❌ Erro ao inicializar:', error);
-            this.initialized = false;
-            return false;
+    try {
+        console.log('🔧 Inicializando Firebase App Integration...');
+        
+        // Aguardar um pouco para garantir carregamento
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Verificar se Firebase está disponível
+        if (typeof firebase === 'undefined') {
+            throw new Error('Firebase SDK não carregado');
         }
+        
+        // Aguardar configuração
+        if (!window.firebaseConfig) {
+            await this.waitForConfig();
+        }
+        
+        const refs = window.firebaseConfig?.getFirebaseRefs();
+        if (!refs || !refs.db) {
+            throw new Error('Firebase não disponível');
+        }
+
+        this.db = refs.db;
+        this.auth = refs.auth;
+        this.initialized = true;
+        this.sessionId = this.getSessionId();
+        
+        console.log('✅ Firebase App Integration inicializado');
+        console.log('📝 Sessão:', this.sessionId);
+        
+        // Testar conexão
+        await this.testConnection();
+        
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Erro ao inicializar:', error.message);
+        this.initialized = false;
+        this.setupOfflineMode();
+        return false;
     }
+}
+
+async testConnection() {
+    if (!this.initialized || !this.db) {
+        return false;
+    }
+
+    try {
+        // Teste simples de conexão
+        const testDoc = this.db.collection('_tests').doc('connection');
+        await testDoc.set({
+            test: true,
+            timestamp: new Date().toISOString()
+        });
+        
+        console.log('✅ Conexão Firebase testada com sucesso');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Erro ao testar conexão:', error.message);
+        return false;
+    }
+}
+
+setupOfflineMode() {
+    console.warn('⚠️ Configurando modo offline');
+    this.initialized = false;
+    
+    // Mostrar notificação
+    if (typeof showNotification === 'function') {
+        setTimeout(() => {
+            showNotification('Sistema operando em modo offline', 'warning');
+        }, 1000);
+    }
+}
 
     async waitForConfig() {
         return new Promise((resolve, reject) => {
