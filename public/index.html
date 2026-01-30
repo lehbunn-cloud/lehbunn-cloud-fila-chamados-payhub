@@ -362,30 +362,31 @@
         }, 10000);
     });
 </script>
-	<script>
-    // Atualizar status do loading
-    function updateLoadingStatus(message) {
-        const statusElement = document.getElementById('loadingStatus');
-        if (statusElement) {
-            statusElement.textContent = message;
-        }
-    }
-    
-    // Monitorar inicialização
+<script>
+    // Esconder overlay quando tudo estiver carregado
     document.addEventListener('DOMContentLoaded', function() {
-        updateLoadingStatus('Inicializando Firebase...');
-        
-        // Monitorar status do Firebase
-        const checkFirebase = setInterval(() => {
-            if (window.firebaseAppIntegration) {
-                if (window.firebaseAppIntegration.initialized) {
-                    updateLoadingStatus('Firebase conectado! Carregando dados...');
-                    clearInterval(checkFirebase);
-                } else {
-                    updateLoadingStatus('Firebase offline, usando modo local...');
-                }
+        // Verificar se os analistas foram carregados
+        const checkAnalystsLoaded = setInterval(() => {
+            const analystContainer = document.getElementById('analystStatusColumns');
+            if (analystContainer && !analystContainer.innerHTML.includes('Carregando')) {
+                clearInterval(checkAnalystsLoaded);
+                // Dar tempo para animações
+                setTimeout(() => {
+                    const loadingOverlay = document.getElementById('loadingOverlay');
+                    if (loadingOverlay) {
+                        loadingOverlay.style.display = 'none';
+                    }
+                }, 500);
             }
         }, 500);
+        
+        // Timeout de segurança
+        setTimeout(() => {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingOverlay) {
+                loadingOverlay.style.display = 'none';
+            }
+        }, 5000);
     });
 </script>
 </body>
