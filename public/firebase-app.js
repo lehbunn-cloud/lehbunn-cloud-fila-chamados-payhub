@@ -13,81 +13,84 @@ class FirebaseAppIntegration {
     }
 
     async init() {
-    try {
-        console.log('🔧 Inicializando Firebase App Integration...');
-        
-        // Aguardar um pouco para garantir carregamento
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Verificar se Firebase está disponível
-        if (typeof firebase === 'undefined') {
-            throw new Error('Firebase SDK não carregado');
+        try {
+            console.log('🔧 Inicializando Firebase App Integration...');
+            
+            // Aguardar um pouco para garantir carregamento
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Verificar se Firebase está disponível
+            if (typeof firebase === 'undefined') {
+                throw new Error('Firebase SDK não carregado');
+            }
+            
+            // Aguardar configuração
+            if (!window.firebaseConfig) {
+                await this.waitForConfig();
+            }
+            
+            const refs = window.firebaseConfig?.getFirebaseRefs();
+            if (!refs || !refs.db) {
+                throw new Error('Firebase não disponível');
+            }
+
+            this.db = refs.db;
+            this.auth = refs.auth;
+            this.initialized = true;
+            this.sessionId = this.getSessionId();
+            
+            console.log('✅ Firebase App Integration inicializado');
+            console.log('📝 Sessão:', this.sessionId);
+            
+            // Testar conexão
+            await this.testConnection();
+            
+            // Sincronizar tickets offline
+            await this.syncOfflineTickets();
+            
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Erro ao inicializar:', error.message);
+            this.initialized = false;
+            this.setupOfflineMode();
+            return false;
         }
-        
-        // Aguardar configuração
-        if (!window.firebaseConfig) {
-            await this.waitForConfig();
-        }
-        
-        const refs = window.firebaseConfig?.getFirebaseRefs();
-        if (!refs || !refs.db) {
-            throw new Error('Firebase não disponível');
+    }
+
+    async testConnection() {
+        if (!this.initialized || !this.db) {
+            return false;
         }
 
-        this.db = refs.db;
-        this.auth = refs.auth;
-        this.initialized = true;
-        this.sessionId = this.getSessionId();
-        
-        console.log('✅ Firebase App Integration inicializado');
-        console.log('📝 Sessão:', this.sessionId);
-        
-        // Testar conexão
-        await this.testConnection();
-        
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Erro ao inicializar:', error.message);
+        try {
+            const testDoc = this.db.collection('_tests').doc('connection');
+            await testDoc.set({
+                test: true,
+                timestamp: new Date().toISOString(),
+                message: 'Teste de conexão do sistema'
+            });
+            
+            console.log('✅ Conexão Firebase testada com sucesso');
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Erro ao testar conexão:', error.message);
+            return false;
+        }
+    }
+
+    setupOfflineMode() {
+        console.warn('⚠️ Configurando modo offline');
         this.initialized = false;
-        this.setupOfflineMode();
-        return false;
-    }
-}
-
-async testConnection() {
-    if (!this.initialized || !this.db) {
-        return false;
-    }
-
-    try {
-        // Teste simples de conexão
-        const testDoc = this.db.collection('_tests').doc('connection');
-        await testDoc.set({
-            test: true,
-            timestamp: new Date().toISOString()
-        });
         
-        console.log('✅ Conexão Firebase testada com sucesso');
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Erro ao testar conexão:', error.message);
-        return false;
+        // Mostrar notificação
+        if (typeof showNotification === 'function') {
+            setTimeout(() => {
+                showNotification('Sistema operando em modo offline', 'warning');
+            }, 1000);
+        }
     }
-}
-
-setupOfflineMode() {
-    console.warn('⚠️ Configurando modo offline');
-    this.initialized = false;
-    
-    // Mostrar notificação
-    if (typeof showNotification === 'function') {
-        setTimeout(() => {
-            showNotification('Sistema operando em modo offline', 'warning');
-        }, 1000);
-    }
-}
 
     async waitForConfig() {
         return new Promise((resolve, reject) => {
@@ -148,9 +151,6 @@ setupOfflineMode() {
             this.lastSaveTime = new Date();
             console.log('✅ Estado salvo no Firebase');
             
-            // Atualizar UI
-            this.updateLastSavedUI();
-            
             return true;
             
         } catch (error) {
@@ -200,18 +200,22 @@ setupOfflineMode() {
     }
 
     // ============================================
-    // FUNÇÕES PARA TICKETS
+    // FUNÇÕES PARA TICKETS - CORRIGIDAS!
     // ============================================
 
     async saveTicketToFirebase(ticketNumber, analystName, status = 'iniciado', clientType = 'normal') {
         if (!this.initialized || !this.db) {
-            console.warn('⚠️ Salvando ticket localmente');
+            console.warn('⚠️ Firebase não disponível, salvando localmente');
             this.saveTicketLocally(ticketNumber, analystName, status, clientType);
             return null;
         }
 
         try {
+            // Criar ID único para o ticket
+            const ticketId = `ticket_${ticketNumber}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
             const ticketData = {
+                ticketId: ticketId,
                 ticketNumber: ticketNumber.toString(),
                 analystName: analystName,
                 status: status,
@@ -219,14 +223,19 @@ setupOfflineMode() {
                 startTime: new Date().toISOString(),
                 sessionId: this.sessionId,
                 createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                synced: true
             };
 
-            const ticketId = `ticket_${ticketNumber}_${Date.now()}`;
+            // SALVAR no Firebase - usando set() em vez de add()
+            const ticketRef = this.db.collection('tickets').doc(ticketId);
+            await ticketRef.set(ticketData);
             
-            await this.db.collection('tickets').doc(ticketId).set(ticketData);
+            console.log(`✅ Ticket ${ticketNumber} salvo no Firebase (ID: ${ticketId})`);
             
-            console.log(`✅ Ticket ${ticketNumber} salvo`);
+            // Também salvar localmente como backup
+            this.saveTicketLocally(ticketNumber, analystName, status, clientType);
+            
             return ticketId;
             
         } catch (error) {
@@ -243,6 +252,9 @@ setupOfflineMode() {
         }
 
         try {
+            console.log(`🔄 Atualizando ticket ${ticketNumber} para status: ${status}`);
+            
+            // Buscar o ticket mais recente com este número
             const ticketsRef = this.db.collection('tickets');
             const querySnapshot = await ticketsRef
                 .where('ticketNumber', '==', ticketNumber.toString())
@@ -252,11 +264,35 @@ setupOfflineMode() {
                 .get();
             
             if (querySnapshot.empty) {
-                console.warn(`⚠️ Ticket ${ticketNumber} não encontrado`);
-                return false;
+                console.warn(`⚠️ Ticket ${ticketNumber} não encontrado. Buscando qualquer ticket com este número...`);
+                
+                // Buscar qualquer ticket com este número (fallback)
+                const fallbackSnapshot = await ticketsRef
+                    .where('ticketNumber', '==', ticketNumber.toString())
+                    .orderBy('createdAt', 'desc')
+                    .limit(1)
+                    .get();
+                
+                if (fallbackSnapshot.empty) {
+                    console.error(`❌ Ticket ${ticketNumber} não encontrado em nenhum status`);
+                    return false;
+                }
+                
+                const ticketDoc = fallbackSnapshot.docs[0];
+                return await this.updateTicketDoc(ticketDoc, status, analystName);
             }
 
             const ticketDoc = querySnapshot.docs[0];
+            return await this.updateTicketDoc(ticketDoc, status, analystName);
+            
+        } catch (error) {
+            console.error('❌ Erro ao atualizar ticket:', error);
+            return false;
+        }
+    }
+
+    async updateTicketDoc(ticketDoc, status, analystName = null) {
+        try {
             const updateData = {
                 status: status,
                 updatedAt: new Date().toISOString()
@@ -269,7 +305,7 @@ setupOfflineMode() {
                 if (ticketData.startTime) {
                     const startTime = new Date(ticketData.startTime);
                     const endTime = new Date();
-                    updateData.duration = Math.round((endTime - startTime) / 1000);
+                    updateData.duration = Math.round((endTime - startTime) / 1000); // segundos
                 }
             }
 
@@ -278,11 +314,11 @@ setupOfflineMode() {
             }
 
             await ticketDoc.ref.update(updateData);
-            console.log(`✅ Ticket ${ticketNumber} atualizado`);
+            console.log(`✅ Ticket ${ticketDoc.data().ticketNumber} atualizado para status: ${status}`);
             return true;
             
         } catch (error) {
-            console.error('❌ Erro ao atualizar ticket:', error);
+            console.error('❌ Erro ao atualizar documento:', error);
             return false;
         }
     }
@@ -330,6 +366,7 @@ setupOfflineMode() {
 
     async getTicketsByDateRange(startDate, endDate, includeAll = false) {
         if (!this.initialized || !this.db) {
+            console.warn('⚠️ Firebase não disponível para consulta');
             return [];
         }
 
@@ -356,6 +393,7 @@ setupOfflineMode() {
                 });
             });
 
+            console.log(`📊 Encontrados ${tickets.length} tickets no período`);
             return tickets;
             
         } catch (error) {
@@ -405,27 +443,39 @@ setupOfflineMode() {
     saveTicketLocally(ticketNumber, analystName, status, clientType) {
         try {
             const tickets = JSON.parse(localStorage.getItem('offline_tickets') || '[]');
-            tickets.push({
+            const ticketData = {
                 ticketNumber,
                 analystName,
                 status,
                 clientType,
                 timestamp: new Date().toISOString(),
                 synced: false
-            });
+            };
             
-            if (tickets.length > 100) {
-                tickets.splice(0, tickets.length - 100);
+            // Verificar se já existe (para evitar duplicação)
+            const exists = tickets.some(t => 
+                t.ticketNumber === ticketNumber && 
+                t.status === status && 
+                Math.abs(new Date(t.timestamp) - new Date(ticketData.timestamp)) < 60000 // 1 minuto
+            );
+            
+            if (!exists) {
+                tickets.push(ticketData);
+                
+                if (tickets.length > 100) {
+                    tickets.splice(0, tickets.length - 100);
+                }
+                
+                localStorage.setItem('offline_tickets', JSON.stringify(tickets));
+                console.log(`📱 Ticket ${ticketNumber} salvo localmente`);
             }
-            
-            localStorage.setItem('offline_tickets', JSON.stringify(tickets));
         } catch (error) {
             console.error('❌ Erro ao salvar ticket localmente:', error);
         }
     }
 
     async syncOfflineTickets() {
-        if (!this.initialized) return;
+        if (!this.initialized || !this.db) return;
         
         try {
             const offlineTickets = JSON.parse(localStorage.getItem('offline_tickets') || '[]');
@@ -433,23 +483,39 @@ setupOfflineMode() {
             
             if (pendingTickets.length === 0) return;
             
-            console.log(`🔄 Sincronizando ${pendingTickets.length} tickets...`);
+            console.log(`🔄 Sincronizando ${pendingTickets.length} tickets offline...`);
             
+            let syncedCount = 0;
             for (const ticket of pendingTickets) {
                 try {
-                    await this.saveTicketToFirebase(
-                        ticket.ticketNumber,
-                        ticket.analystName,
-                        ticket.status,
-                        ticket.clientType
-                    );
+                    const ticketId = `offline_${ticket.ticketNumber}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    
+                    await this.db.collection('tickets').doc(ticketId).set({
+                        ticketId: ticketId,
+                        ticketNumber: ticket.ticketNumber,
+                        analystName: ticket.analystName,
+                        status: ticket.status,
+                        clientType: ticket.clientType,
+                        startTime: ticket.timestamp,
+                        createdAt: ticket.timestamp,
+                        updatedAt: new Date().toISOString(),
+                        synced: true,
+                        source: 'offline_sync'
+                    });
+                    
                     ticket.synced = true;
+                    syncedCount++;
+                    
                 } catch (error) {
-                    console.error(`❌ Erro ao sincronizar:`, error);
+                    console.error(`❌ Erro ao sincronizar ticket ${ticket.ticketNumber}:`, error);
                 }
             }
             
             localStorage.setItem('offline_tickets', JSON.stringify(offlineTickets));
+            
+            if (syncedCount > 0) {
+                console.log(`✅ ${syncedCount} tickets offline sincronizados`);
+            }
             
         } catch (error) {
             console.error('❌ Erro na sincronização:', error);
@@ -532,9 +598,9 @@ setupOfflineMode() {
 
 window.firebaseAppIntegration = new FirebaseAppIntegration();
 
-// Função de teste
+// Função de teste aprimorada
 window.testFirebaseIntegration = async function() {
-    console.log('🧪 Testando Firebase...');
+    console.log('🧪 Testando Firebase Integration...');
     
     const integration = window.firebaseAppIntegration;
     if (!integration.initialized) {
@@ -543,22 +609,50 @@ window.testFirebaseIntegration = async function() {
     }
 
     try {
+        // Teste 1: Salvar ticket de teste
+        const testTicketNumber = 'TEST_' + Date.now();
         const testId = await integration.saveTicketToFirebase(
-            'TEST_' + Date.now(),
+            testTicketNumber,
             'Test Analyst',
             'iniciado',
             'test'
         );
         
-        if (testId) {
-            console.log('✅ Teste bem-sucedido');
-            return true;
+        if (!testId) {
+            console.error('❌ Falha ao salvar ticket de teste');
+            return false;
         }
-        return false;
+        
+        console.log('✅ Ticket de teste salvo:', testId);
+        
+        // Teste 2: Atualizar status
+        const updateSuccess = await integration.updateTicketStatus(
+            testTicketNumber,
+            'finalizado',
+            'Test Analyst'
+        );
+        
+        if (!updateSuccess) {
+            console.warn('⚠️ Falha ao atualizar ticket de teste');
+        } else {
+            console.log('✅ Ticket de teste atualizado');
+        }
+        
+        // Teste 3: Consultar tickets
+        const tickets = await integration.getTicketsByDateRange(
+            new Date().toISOString().split('T')[0],
+            new Date().toISOString().split('T')[0],
+            true
+        );
+        
+        console.log('📊 Tickets encontrados:', tickets.length);
+        
+        return true;
+        
     } catch (error) {
         console.error('❌ Erro no teste:', error);
         return false;
     }
 };
 
-console.log('✅ Firebase App Integration carregado');
+console.log('✅ Firebase App Integration CORRIGIDO carregado');
