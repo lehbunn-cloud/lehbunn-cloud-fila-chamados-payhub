@@ -350,5 +350,31 @@
             }, 1500);
         });
     </script>
+	<script>
+    // Atualizar status do loading
+    function updateLoadingStatus(message) {
+        const statusElement = document.getElementById('loadingStatus');
+        if (statusElement) {
+            statusElement.textContent = message;
+        }
+    }
+    
+    // Monitorar inicialização
+    document.addEventListener('DOMContentLoaded', function() {
+        updateLoadingStatus('Inicializando Firebase...');
+        
+        // Monitorar status do Firebase
+        const checkFirebase = setInterval(() => {
+            if (window.firebaseAppIntegration) {
+                if (window.firebaseAppIntegration.initialized) {
+                    updateLoadingStatus('Firebase conectado! Carregando dados...');
+                    clearInterval(checkFirebase);
+                } else {
+                    updateLoadingStatus('Firebase offline, usando modo local...');
+                }
+            }
+        }, 500);
+    });
+</script>
 </body>
 </html>
