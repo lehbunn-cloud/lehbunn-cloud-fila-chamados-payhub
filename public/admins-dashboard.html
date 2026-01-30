@@ -512,64 +512,84 @@
     </div>
     
     <!-- Scripts -->
+    <!-- Scripts -->
     <script src="firebase-config.js"></script>
     <script src="firebase-app.js"></script>
     <script>
-        // VERIFICAÇÃO DE AUTENTICAÇÃO SIMPLIFICADA
+        // VERIFICAÇÃO DE AUTENTICAÇÃO ROBUSTA
         document.addEventListener('DOMContentLoaded', function() {
             console.log('=== DASHBOARD INICIALIZANDO ===');
             
             const authOverlay = document.getElementById('authOverlay');
             
-            // Função de verificação direta
-            function checkAuthentication() {
+            // Função de verificação robusta
+            function checkAdminAuth() {
+                console.log('🔍 Verificando autenticação...');
+                
+                // Verificar se há sessão válida
                 const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
                 const loginTime = sessionStorage.getItem('admin_login_time');
+                const username = sessionStorage.getItem('admin_username');
                 
-                console.log('Verificando sessão...', {
+                console.log('Dados da sessão:', {
                     isAuthenticated: isAuthenticated,
+                    username: username,
                     loginTime: loginTime
                 });
                 
+                // Se não autenticado, redirecionar imediatamente
                 if (!isAuthenticated) {
-                    console.log('❌ Sessão não encontrada, redirecionando para login');
+                    console.log('❌ NÃO AUTENTICADO - Redirecionando para login');
+                    // Forçar limpeza
+                    sessionStorage.clear();
                     window.location.href = 'login.html';
                     return false;
                 }
                 
+                // Se não tem tempo de login
                 if (!loginTime) {
-                    console.log('❌ Tempo de login não encontrado, redirecionando');
-                    sessionStorage.removeItem('admin_authenticated');
-                    sessionStorage.removeItem('admin_username');
+                    console.log('❌ SEM TEMPO DE LOGIN - Redirecionando');
+                    sessionStorage.clear();
                     window.location.href = 'login.html';
                     return false;
                 }
                 
                 // Verificar se a sessão expirou (4 horas)
-                const loginDate = new Date(loginTime);
-                const now = new Date();
-                const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
-                
-                if (hoursDiff >= 4) {
-                    console.log('⚠️ Sessão expirada (' + hoursDiff.toFixed(2) + ' horas)');
-                    sessionStorage.removeItem('admin_authenticated');
-                    sessionStorage.removeItem('admin_username');
-                    sessionStorage.removeItem('admin_login_time');
+                try {
+                    const loginDate = new Date(loginTime);
+                    const now = new Date();
+                    const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
+                    
+                    console.log(`Tempo desde login: ${hoursDiff.toFixed(2)} horas`);
+                    
+                    if (hoursDiff >= 4) {
+                        console.log('⚠️ SESSÃO EXPIRADA - Redirecionando');
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('Erro ao verificar tempo de login:', error);
+                    sessionStorage.clear();
                     window.location.href = 'login.html';
                     return false;
                 }
                 
-                console.log('✅ Sessão válida (' + hoursDiff.toFixed(2) + ' horas atrás)');
+                console.log('✅ SESSÃO VÁLIDA - Carregando dashboard');
                 return true;
             }
             
-            // VERIFICAÇÃO IMEDIATA
-            if (!checkAuthentication()) {
-                return; // Para a execução se não estiver autenticado
+            // EXECUTAR VERIFICAÇÃO IMEDIATAMENTE
+            const isAuthenticated = checkAdminAuth();
+            
+            if (!isAuthenticated) {
+                // Se não autenticado, para a execução
+                console.log('⛔ Dashboard não carregado - Usuário não autenticado');
+                return;
             }
             
-            // SE AUTENTICADO, CONTINUAR
-            console.log('✅ Dashboard carregando para usuário autenticado');
+            // SE AUTENTICADO, CONTINUAR CARREGAMENTO
+            console.log('✅ Dashboard sendo carregado...');
             
             // Esconder overlay após pequeno delay
             setTimeout(() => {
@@ -580,14 +600,21 @@
                 // Carregar nome do admin
                 const adminUsername = sessionStorage.getItem('admin_username') || 'Administrador';
                 document.getElementById('adminUsername').textContent = adminUsername;
-                console.log('Usuário:', adminUsername);
+                console.log('Usuário autenticado:', adminUsername);
                 
                 // Carregar dados do sistema
-                loadDashboard();
-                setupEventListeners();
-                
-                // Atualizar a cada 10 segundos
-                setInterval(loadDashboard, 10000);
+                try {
+                    loadDashboard();
+                    setupEventListeners();
+                    
+                    // Atualizar a cada 10 segundos
+                    setInterval(loadDashboard, 10000);
+                    
+                    console.log('✅ Dashboard completamente carregado');
+                } catch (error) {
+                    console.error('Erro ao carregar dashboard:', error);
+                    showNotification('Erro ao carregar dados do sistema', 'error');
+                }
                 
             }, 500);
         });
