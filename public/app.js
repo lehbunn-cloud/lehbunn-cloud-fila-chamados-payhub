@@ -1,3 +1,5 @@
+// REMOVA TODO O CONTEÚDO ATUAL DO app.js E SUBSTITUA POR ESTE:
+
 // ============================================
 // PORTAL DE FILA DE CHAMADOS - PAYHUB
 // ============================================
@@ -45,100 +47,120 @@ let appState = {
     lastSaveTime: null
 };
 
-// ============================================ 
+// ============================================
 // INICIALIZAÇÃO
 // ============================================
 
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Inicializando Portal v3.5.0...');
     
     // Esconder loading overlay
     const loadingOverlay = document.getElementById('loadingOverlay');
     
+    // Inicializar de forma síncrona primeiro
+    initializeAppSync();
+    
+    // Depois inicializar async
+    setTimeout(async () => {
+        try {
+            await initializeAppAsync();
+            console.log('✅ Sistema inicializado com Firebase');
+        } catch (error) {
+            console.error('❌ Erro na inicialização async:', error);
+        } finally {
+            // Sempre esconder loading
+            if (loadingOverlay) {
+                loadingOverlay.style.display = 'none';
+            }
+        }
+    }, 1000);
+});
+
+function initializeAppSync() {
     try {
         // Gerar ID de sessão
         appState.sessionId = generateSessionId();
         sessionStorage.setItem('queue_session_id', appState.sessionId);
         
+        // Atualizar interface básica
+        updateCurrentTime();
+        updateAnalystAvailability();
+        updateQueueOrder();
+        updateStatistics();
+        updateLastUpdateTime();
+        
+        // Configurar eventos básicos
+        setupEventListeners();
+        
+        // Configurar auto-refresh
+        setupAutoRefresh();
+        
+        // Focar no input
+        focusMainInput();
+        
+        console.log('✅ Sistema básico inicializado');
+        
+    } catch (error) {
+        console.error('❌ Erro na inicialização síncrona:', error);
+    }
+}
+
+async function initializeAppAsync() {
+    try {
         // Aguardar Firebase inicializar
         await waitForFirebase();
         
-        // Inicializar aplicação
-        await initializeApp();
-        
-        console.log('✅ Sistema inicializado');
-        
-    } catch (error) {
-        console.error('❌ Erro crítico:', error);
-        showError('Erro ao inicializar sistema');
-    } finally {
-        // Sempre esconder loading
-        if (loadingOverlay) {
-            loadingOverlay.style.display = 'none';
-        }
-    }
-});
-
-// ============================================
-// FUNÇÕES DE INICIALIZAÇÃO
-// ============================================
-
-async function waitForFirebase() {
-    return new Promise((resolve) => {
-        let attempts = 0;
-        const maxAttempts = 10;
-        
-        const checkInterval = setInterval(() => {
-            attempts++;
-            
-            if (window.firebaseAppIntegration && 
-                (window.firebaseAppIntegration.initialized || attempts >= maxAttempts)) {
-                clearInterval(checkInterval);
-                resolve();
-            }
-            
-            if (attempts % 3 === 0) {
-                console.log(`⏳ Aguardando Firebase... (${attempts}/${maxAttempts})`);
-            }
-        }, 500);
-    });
-}
-
-async function initializeApp() {
-    try {
-        // 1. Carregar estado salvo
+        // Carregar estado salvo
         await loadSavedState();
         
-        // 2. Atualizar interface
-        updateCurrentTime();
-        updateAnalystAvailability();
-        updateQueueOrder();
+        // Atualizar interface completa
         createAnalystStatusColumns();
         updateSpecialCasesDisplay();
-        updateStatistics();
-        updateLastUpdateTime();
         
-        // 3. Configurar eventos
-        setupEventListeners();
-        
-        // 4. Configurar auto-salvamento
+        // Configurar auto-salvamento
         setupAutoSave();
         
-        // 5. Configurar auto-refresh
-        setupAutoRefresh();
-        
-        // 6. Verificar reset diário
+        // Verificar reset diário
         checkDailyReset();
         
-        // 7. Focar no input
-        focusMainInput();
+        // Atualizar sessão no rodapé
+        const sessionElement = document.getElementById('sessionId');
+        if (sessionElement && appState.sessionId) {
+            sessionElement.textContent = appState.sessionId.substring(0, 12) + '...';
+        }
         
         showNotification('Sistema carregado com sucesso!', 'success');
         
     } catch (error) {
-        console.error('❌ Erro na inicialização:', error);
-        showError('Erro ao inicializar: ' + error.message);
+        console.error('❌ Erro na inicialização async:', error);
     }
+}
+
+async function waitForFirebase() {
+    return new Promise((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 20;
+        
+        const checkInterval = setInterval(() => {
+            attempts++;
+            
+            if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+                clearInterval(checkInterval);
+                resolve();
+                return;
+            }
+            
+            if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                console.warn('⚠️ Firebase não inicializado após tentativas');
+                resolve(); // Resolver mesmo sem Firebase
+            }
+            
+            if (attempts % 5 === 0) {
+                console.log(`⏳ Aguardando Firebase... (${attempts}/${maxAttempts})`);
+            }
+        }, 500);
+    });
 }
 
 // ============================================
@@ -148,289 +170,19 @@ async function initializeApp() {
 async function loadSavedState() {
     console.log('📂 Carregando estado salvo...');
     
-    // Tentar Firebase primeiro
-    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
-        const savedState = await window.firebaseAppIntegration.loadFullState();
-        if (savedState) {
-            restoreFromFirebaseState(savedState);
-            appState.firebaseStatus = 'connected';
-            console.log('✅ Estado carregado do Firebase');
-            return;
-        }
-    }
-    
-    // Fallback para localStorage
-    loadFromLocalStorage();
-    appState.firebaseStatus = 'disconnected';
-    console.log('📱 Estado carregado do localStorage');
-}
-
-async function waitForFirebase() {
-    return new Promise((resolve) => {
-        let attempts = 0;
-        const maxAttempts = 10;
-        
-        const checkInterval = setInterval(() => {
-            attempts++;
-            
-            if (window.firebaseAppIntegration && 
-                (window.firebaseAppIntegration.initialized || attempts >= maxAttempts)) {
-                clearInterval(checkInterval);
-                resolve();
-            }
-            
-            if (attempts % 3 === 0) {
-                console.log(`⏳ Aguardando Firebase... (${attempts}/${maxAttempts})`);
-            }
-        }, 500);
-    });
-}
-   
-// ============================================
-// FUNÇÕES FALTANTES - ADICIONAR NO INÍCIO DO app.js
-// ============================================
-
-function updateAnalystAvailability() {
-    const now = appState.simulatedTime ? new Date(appState.simulatedTime) : new Date();
-    const currentHour = now.getHours();
-    const currentMinutes = now.getMinutes();
-    const currentTime = currentHour + currentMinutes / 100;
-    
-    let needsRefresh = false;
-    
-    window.analysts.forEach(analyst => {
-        const newAvailability = (currentTime >= analyst.startTime && currentTime < analyst.endTime);
-        
-        if (analyst.isAvailable !== newAvailability) {
-            analyst.isAvailable = newAvailability;
-            needsRefresh = true;
-        }
-        
-        // Se saiu do horário, liberar
-        if (!analyst.isAvailable && (analyst.isBusy || analyst.currentTicket)) {
-            analyst.isBusy = false;
-            analyst.currentTicket = null;
-            analyst.ticketStatus = null;
-            analyst.ticketSpecialType = null;
-            analyst.isWaitingForClient = false;
-            analyst.inQueue = false;
-            needsRefresh = true;
-        }
-    });
-    
-    if (needsRefresh) {
-        updateQueueOrder();
-        updateStatistics();
-        updateSpecialCasesDisplay();
-        saveState();
-    }
-    
-    return needsRefresh;
-}
-
-function updateQueueOrder() {
-    const queueEligible = window.analysts.filter(a => 
-        a.level === "N1" && a.isAvailable && ((!a.isBusy && a.inQueue) || a.isWaitingForClient)
-    );
-    
-    appState.queueOrder = [...queueEligible].sort((a, b) => {
-        if (!a.isWaitingForClient && b.isWaitingForClient) return -1;
-        if (a.isWaitingForClient && !b.isWaitingForClient) return 1;
-        return a.ticketsHandled - b.ticketsHandled;
-    });
-}
-
-function updateStatistics() {
-    updateElementText('totalTickets', appState.ticketsToday);
-    updateElementText('specialTickets', appState.specialTicketsToday);
-    
-    const available = window.analysts.filter(a => a.isAvailable && !a.isBusy && !a.currentTicket).length;
-    updateElementText('availableAnalystsStat', available);
-    
-    const waiting = window.analysts.filter(a => a.isWaitingForClient).length;
-    updateElementText('waitingTickets', waiting);
-    appState.waitingTicketsToday = waiting;
-    
-    const next = appState.queueOrder.length > 0 ? appState.queueOrder[0].name : '-';
-    updateElementText('nextInQueue', next);
-    
-    updateElementText('lastResetDate', appState.lastReset);
-    
-    // Atualizar contador de analistas
-    updateElementText('analystCount', `${window.analysts.length} analistas`);
-}
-
-function updateElementText(id, text) {
-    const element = document.getElementById(id);
-    if (element) element.textContent = text;
-}
-
-function updateLastUpdateTime() {
-    const now = new Date().toLocaleTimeString('pt-BR');
-    updateElementText('lastUpdate', now);
-}
-
-function setupAutoRefresh() {
-    // Atualizar hora a cada segundo
-    setInterval(updateCurrentTime, 1000);
-    
-    // Atualizar disponibilidade a cada minuto
-    setInterval(() => {
-        updateAnalystAvailability();
-        createAnalystStatusColumns();
-    }, 60000);
-    
-    // Atualizar estatísticas a cada 30 segundos
-    setInterval(updateStatistics, 30000);
-}
-
-function checkDailyReset() {
-    const today = new Date().toLocaleDateString('pt-BR');
-    if (today !== appState.lastReset && !appState.dailyResetDone) {
-        appState.dailyResetDone = true;
-        // Não resetar automaticamente, apenas notificar
-        console.log('ℹ️ Novo dia detectado, use "Reiniciar Dia" para limpar');
-    }
-}
-
-function focusMainInput() {
-    setTimeout(() => {
-        const input = document.getElementById('newTicketNumber');
-        if (input) {
-            input.focus();
-            input.select();
-        }
-    }, 100);
-}
-
-function setupAutoSave() {
-    // Salvar a cada 30 segundos
-    setInterval(async () => {
-        if (window.firebaseAppIntegration?.initialized) {
-            await saveState();
-            console.log('💾 Auto-salvamento realizado');
-        }
-    }, 30000);
-}
-
-function attachCardEvents() {
-    // Botões de atribuição rápida
-    document.querySelectorAll('.assign-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const analystId = parseInt(this.getAttribute('data-id'));
-            const input = document.querySelector(`.quick-input[data-id="${analystId}"]`);
-            const ticketNumber = input?.value.trim();
-            
-            if (ticketNumber) {
-                assignTicketToAnalyst(analystId, ticketNumber, 'normal');
-                if (input) input.value = '';
-            } else {
-                showNotification('Digite o número do ticket', 'warning');
-                if (input) input.focus();
-            }
-        });
-    });
-    
-    // Inputs de atribuição rápida (Enter)
-    document.querySelectorAll('.quick-input').forEach(input => {
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const analystId = parseInt(this.getAttribute('data-id'));
-                const ticketNumber = this.value.trim();
-                
-                if (ticketNumber) {
-                    assignTicketToAnalyst(analystId, ticketNumber, 'normal');
-                    this.value = '';
-                }
-            }
-        });
-    });
-    
-    // Botões em cards ocupados
-    document.querySelectorAll('.wait-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const analystId = parseInt(this.getAttribute('data-id'));
-            setTicketWaiting(analystId);
-        });
-    });
-    
-    document.querySelectorAll('.finish-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const analystId = parseInt(this.getAttribute('data-id'));
-            finishTicket(analystId);
-        });
-    });
-    
-    // Botões de retomar
-    document.querySelectorAll('.resume-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const analystId = parseInt(this.getAttribute('data-id'));
-            resumeTicket(analystId);
-        });
-    });
-}
-
-   
-    // Inicializar aplicação
-    await initializeApp();
-    
-    console.log('✅ Sistema inicializado');
-});
-
-async function initializeApp() {
     try {
-        // 1. Carregar estado salvo
-        await loadSavedState();
-        
-        // 2. Atualizar interface
-        updateCurrentTime();
-        updateAnalystAvailability();
-        updateQueueOrder();
-        createAnalystStatusColumns();
-        updateSpecialCasesDisplay();
-        updateStatistics();
-        updateLastUpdateTime();
-        
-        // 3. Configurar eventos
-        setupEventListeners();
-        
-        // 4. Configurar auto-salvamento
-        setupAutoSave();
-        
-        // 5. Configurar auto-refresh
-        setupAutoRefresh();
-        
-        // 6. Verificar reset diário
-        checkDailyReset();
-        
-        // 7. Focar no input
-        focusMainInput();
-        
-        showNotification('Sistema carregado com sucesso!', 'success');
-        
-    } catch (error) {
-        console.error('❌ Erro na inicialização:', error);
-        showError('Erro ao inicializar: ' + error.message);
-    }
-}
-
-// ============================================
-// PERSISTÊNCIA
-// ============================================
-
-async function loadSavedState() {
-    console.log('📂 Carregando estado salvo...');
-    
-    // Tentar Firebase primeiro
-    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
-        const savedState = await window.firebaseAppIntegration.loadFullState();
-        if (savedState) {
-            restoreFromFirebaseState(savedState);
-            appState.firebaseStatus = 'connected';
-            console.log('✅ Estado carregado do Firebase');
-            return;
+        // Tentar Firebase primeiro
+        if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+            const savedState = await window.firebaseAppIntegration.loadFullState();
+            if (savedState) {
+                restoreFromFirebaseState(savedState);
+                appState.firebaseStatus = 'connected';
+                console.log('✅ Estado carregado do Firebase');
+                return;
+            }
         }
+    } catch (firebaseError) {
+        console.warn('⚠️ Erro ao carregar do Firebase:', firebaseError);
     }
     
     // Fallback para localStorage
@@ -444,18 +196,22 @@ async function saveState() {
     
     const stateToSave = prepareStateForSave();
     
-    // Salvar localmente
-    saveToLocalStorage(stateToSave);
-    
-    // Salvar no Firebase se disponível
-    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
-        const success = await window.firebaseAppIntegration.saveFullState(stateToSave);
-        if (success) {
-            appState.firebaseStatus = 'connected';
-            appState.lastSaveTime = new Date();
-        } else {
-            appState.firebaseStatus = 'disconnected';
+    try {
+        // Salvar localmente
+        saveToLocalStorage(stateToSave);
+        
+        // Salvar no Firebase se disponível
+        if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+            const success = await window.firebaseAppIntegration.saveFullState(stateToSave);
+            if (success) {
+                appState.firebaseStatus = 'connected';
+                appState.lastSaveTime = new Date();
+            } else {
+                appState.firebaseStatus = 'disconnected';
+            }
         }
+    } catch (error) {
+        console.error('❌ Erro ao salvar estado:', error);
     }
 }
 
@@ -533,6 +289,10 @@ function restoreFromFirebaseState(savedState) {
             window.analysts.find(a => a.id === id)
         ).filter(a => a);
     }
+    
+    updateAnalystAvailability();
+    updateQueueOrder();
+    updateStatistics();
 }
 
 function saveToLocalStorage(state) {
@@ -561,7 +321,10 @@ function loadFromLocalStorage() {
 
 function createAnalystStatusColumns() {
     const container = document.getElementById('analystStatusColumns');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ Container analystStatusColumns não encontrado');
+        return;
+    }
     
     // Atualizar status
     updateAnalystStatusFlags();
@@ -644,7 +407,7 @@ function createAnalystStatusColumns() {
                 <div class="waiting-item">
                     <span>${analyst.name}</span>
                     <small>${analyst.currentTicket || 'Sem ticket'}</small>
-                    <button class="btn-small resume-btn" data-id="${analyst.id}">
+                    <button class="btn-small resume-btn" data-id="${analyst.id}" onclick="resumeTicket(${analyst.id})">
                         <i class="fas fa-play"></i> Retomar
                     </button>
                 </div>
@@ -701,7 +464,7 @@ function createAnalystCardHTML(analyst, status) {
             <div class="quick-assign">
                 <input type="text" class="quick-input" data-id="${analyst.id}" 
                        placeholder="Nº chamado" value="">
-                <button class="btn-small assign-btn" data-id="${analyst.id}">
+                <button class="btn-small assign-btn" data-id="${analyst.id}" onclick="handleQuickAssign(${analyst.id})">
                     <i class="fas fa-paperclip"></i> Atribuir
                 </button>
             </div>
@@ -715,10 +478,10 @@ function createAnalystCardHTML(analyst, status) {
                 <strong><i class="fas fa-ticket-alt"></i> ${analyst.currentTicket}</strong>
                 ${specialTag}
                 <div class="ticket-actions">
-                    <button class="btn-small wait-btn" data-id="${analyst.id}">
+                    <button class="btn-small wait-btn" data-id="${analyst.id}" onclick="setTicketWaiting(${analyst.id})">
                         <i class="fas fa-clock"></i> Aguardar
                     </button>
-                    <button class="btn-small finish-btn" data-id="${analyst.id}">
+                    <button class="btn-small finish-btn" data-id="${analyst.id}" onclick="finishTicket(${analyst.id})">
                         <i class="fas fa-check"></i> Finalizar
                     </button>
                 </div>
@@ -798,13 +561,17 @@ async function assignTicketToAnalyst(analystId, ticketNumber, ticketType = 'norm
     }
     
     // Salvar no Firebase
-    if (window.firebaseAppIntegration) {
-        await window.firebaseAppIntegration.saveTicketToFirebase(
-            ticketNumber,
-            analyst.name,
-            'iniciado',
-            ticketType
-        );
+    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+        try {
+            await window.firebaseAppIntegration.saveTicketToFirebase(
+                ticketNumber,
+                analyst.name,
+                'iniciado',
+                ticketType
+            );
+        } catch (error) {
+            console.error('❌ Erro ao salvar ticket no Firebase:', error);
+        }
     }
     
     // Atualizar interface
@@ -826,8 +593,12 @@ async function finishTicket(analystId) {
     const ticketNumber = analyst.currentTicket;
     
     // Salvar no Firebase
-    if (window.firebaseAppIntegration && ticketNumber) {
-        await window.firebaseAppIntegration.updateTicketStatus(ticketNumber, 'finalizado', analyst.name);
+    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized && ticketNumber) {
+        try {
+            await window.firebaseAppIntegration.updateTicketStatus(ticketNumber, 'finalizado', analyst.name);
+        } catch (error) {
+            console.error('❌ Erro ao finalizar ticket no Firebase:', error);
+        }
     }
     
     // Liberar analista
@@ -857,8 +628,12 @@ async function setTicketWaiting(analystId) {
     const ticketNumber = analyst.currentTicket;
     
     // Salvar no Firebase
-    if (window.firebaseAppIntegration && ticketNumber) {
-        await window.firebaseAppIntegration.updateTicketStatus(ticketNumber, 'aguardando', analyst.name);
+    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized && ticketNumber) {
+        try {
+            await window.firebaseAppIntegration.updateTicketStatus(ticketNumber, 'aguardando', analyst.name);
+        } catch (error) {
+            console.error('❌ Erro ao atualizar status no Firebase:', error);
+        }
     }
     
     // Colocar em espera
@@ -887,8 +662,12 @@ async function resumeTicket(analystId) {
     const ticketNumber = analyst.currentTicket;
     
     // Salvar no Firebase
-    if (window.firebaseAppIntegration && ticketNumber) {
-        await window.firebaseAppIntegration.updateTicketStatus(ticketNumber, 'iniciado', analyst.name);
+    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized && ticketNumber) {
+        try {
+            await window.firebaseAppIntegration.updateTicketStatus(ticketNumber, 'iniciado', analyst.name);
+        } catch (error) {
+            console.error('❌ Erro ao retomar ticket no Firebase:', error);
+        }
     }
     
     // Retomar atendimento
@@ -910,9 +689,62 @@ async function resumeTicket(analystId) {
     showNotification(`${analyst.name} retomou o atendimento`, 'success');
 }
 
+function handleQuickAssign(analystId) {
+    const input = document.querySelector(`.quick-input[data-id="${analystId}"]`);
+    if (!input) return;
+    
+    const ticketNumber = input.value.trim();
+    if (!ticketNumber) {
+        showNotification('Digite o número do ticket', 'warning');
+        input.focus();
+        return;
+    }
+    
+    assignTicketToAnalyst(analystId, ticketNumber, 'normal');
+    input.value = '';
+}
+
 // ============================================
 // FUNÇÕES AUXILIARES
 // ============================================
+
+function updateAnalystAvailability() {
+    const now = appState.simulatedTime ? new Date(appState.simulatedTime) : new Date();
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTime = currentHour + currentMinutes / 100;
+    
+    let needsRefresh = false;
+    
+    window.analysts.forEach(analyst => {
+        const newAvailability = (currentTime >= analyst.startTime && currentTime < analyst.endTime);
+        
+        if (analyst.isAvailable !== newAvailability) {
+            analyst.isAvailable = newAvailability;
+            needsRefresh = true;
+        }
+        
+        // Se saiu do horário, liberar
+        if (!analyst.isAvailable && (analyst.isBusy || analyst.currentTicket)) {
+            analyst.isBusy = false;
+            analyst.currentTicket = null;
+            analyst.ticketStatus = null;
+            analyst.ticketSpecialType = null;
+            analyst.isWaitingForClient = false;
+            analyst.inQueue = false;
+            needsRefresh = true;
+        }
+    });
+    
+    if (needsRefresh) {
+        updateQueueOrder();
+        updateStatistics();
+        updateSpecialCasesDisplay();
+        saveState();
+    }
+    
+    return needsRefresh;
+}
 
 function updateAnalystStatusFlags() {
     const now = appState.simulatedTime ? new Date(appState.simulatedTime) : new Date();
@@ -962,6 +794,9 @@ function updateStatistics() {
     updateElementText('nextInQueue', next);
     
     updateElementText('lastResetDate', appState.lastReset);
+    
+    // Atualizar contador de analistas
+    updateElementText('analystCount', `${window.analysts.length} analistas`);
 }
 
 function updateSpecialCasesDisplay() {
@@ -1052,115 +887,6 @@ function updateLastUpdateTime() {
     updateElementText('lastUpdate', now);
 }
 
-// ============================================
-// FUNÇÕES DE CONTROLE
-// ============================================
-
-async function freeAllAnalysts() {
-    if (!confirm('Liberar TODOS os analistas?\n\nIsso finalizará todos os atendimentos.')) {
-        return;
-    }
-    
-    // Salvar tickets no Firebase
-    window.analysts.forEach(analyst => {
-        if (analyst.currentTicket && window.firebaseAppIntegration) {
-            window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
-        }
-    });
-    
-    // Resetar todos os analistas
-    window.analysts.forEach(analyst => {
-        analyst.isBusy = false;
-        analyst.currentTicket = null;
-        analyst.ticketStatus = null;
-        analyst.ticketSpecialType = null;
-        analyst.isWaitingForClient = false;
-        analyst.inQueue = analyst.level === "N1";
-    });
-    
-    updateQueueOrder();
-    updateStatistics();
-    createAnalystStatusColumns();
-    updateSpecialCasesDisplay();
-    
-    await saveState();
-    
-    showNotification('Todos os analistas foram liberados', 'success');
-}
-
-async function resetQueue() {
-    if (!confirm('Reiniciar a fila do dia?\n\nIsso irá zerar todos os contadores e liberar analistas.')) {
-        return;
-    }
-    
-    // Finalizar tickets no Firebase
-    window.analysts.forEach(analyst => {
-        if (analyst.currentTicket && window.firebaseAppIntegration) {
-            window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
-        }
-    });
-    
-    // Resetar estado
-    appState.ticketsToday = 0;
-    appState.specialTicketsToday = 0;
-    appState.waitingTicketsToday = 0;
-    appState.lastReset = new Date().toLocaleDateString('pt-BR');
-    appState.queueOrder = [];
-    appState.nextTicketNumber = 1000;
-    
-    // Resetar analistas
-    window.analysts.forEach(analyst => {
-        analyst.ticketsHandled = 0;
-        analyst.isBusy = false;
-        analyst.currentTicket = null;
-        analyst.ticketStatus = null;
-        analyst.ticketSpecialType = null;
-        analyst.isWaitingForClient = false;
-        analyst.inQueue = analyst.level === "N1";
-        analyst.lastActivity = null;
-    });
-    
-    updateQueueOrder();
-    updateStatistics();
-    createAnalystStatusColumns();
-    updateSpecialCasesDisplay();
-    
-    await saveState();
-    
-    showNotification('Fila reiniciada para o novo dia!', 'success');
-}
-
-function nextAnalyst() {
-    if (appState.queueOrder.length === 0) {
-        showNotification('Não há analistas na fila', 'warning');
-        return;
-    }
-    
-    // Rotacionar fila
-    const first = appState.queueOrder.shift();
-    appState.queueOrder.push(first);
-    
-    updateStatistics();
-    showNotification(`Próximo: ${appState.queueOrder[0]?.name || 'Nenhum'}`, 'info');
-    saveState();
-}
-
-// ============================================
-// FUNÇÕES DE UTILIDADE
-// ============================================
-
-function generateSessionId() {
-    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-function isTicketAlreadyExists(ticketNumber) {
-    return window.analysts.some(a => a.currentTicket === ticketNumber);
-}
-
-function isSpecialClientTicket(ticketNumber, client) {
-    return ticketNumber.toString().toUpperCase().includes(client.toUpperCase());
-}
-
 function updateElementText(id, text) {
     const element = document.getElementById(id);
     if (element) element.textContent = text;
@@ -1195,6 +921,18 @@ function showError(message) {
     showNotification(message, 'error');
 }
 
+function generateSessionId() {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+function isTicketAlreadyExists(ticketNumber) {
+    return window.analysts.some(a => a.currentTicket === ticketNumber);
+}
+
+function isSpecialClientTicket(ticketNumber, client) {
+    return ticketNumber.toString().toUpperCase().includes(client.toUpperCase());
+}
+
 function hideLoginModal() {
     const modal = document.getElementById('loginModal');
     if (modal) modal.style.display = 'none';
@@ -1224,14 +962,14 @@ function checkDailyReset() {
 
 function setupEventListeners() {
     // Botões principais
-    document.getElementById('addTicketBtn').addEventListener('click', handleNewTicket);
-    document.getElementById('nextAnalystBtn').addEventListener('click', nextAnalyst);
-    document.getElementById('resetQueueBtn').addEventListener('click', resetQueue);
-    document.getElementById('freeAllBtn').addEventListener('click', freeAllAnalysts);
-    document.getElementById('simulateTimeBtn').addEventListener('click', openTimeSimulationModal);
-    document.getElementById('realTimeBtn').addEventListener('click', returnToRealTime);
-    document.getElementById('generateReportBtn').addEventListener('click', openReportModal);
-    document.getElementById('testFirebaseBtn').addEventListener('click', testFirebase);
+    document.getElementById('addTicketBtn')?.addEventListener('click', handleNewTicket);
+    document.getElementById('nextAnalystBtn')?.addEventListener('click', nextAnalyst);
+    document.getElementById('resetQueueBtn')?.addEventListener('click', resetQueue);
+    document.getElementById('freeAllBtn')?.addEventListener('click', freeAllAnalysts);
+    document.getElementById('simulateTimeBtn')?.addEventListener('click', openTimeSimulationModal);
+    document.getElementById('realTimeBtn')?.addEventListener('click', returnToRealTime);
+    document.getElementById('generateReportBtn')?.addEventListener('click', openReportModal);
+    document.getElementById('testFirebaseBtn')?.addEventListener('click', testFirebase);
     
     // Input principal (Enter)
     const ticketInput = document.getElementById('newTicketNumber');
@@ -1264,23 +1002,6 @@ function setupEventListeners() {
 }
 
 function attachCardEvents() {
-    // Botões de atribuição rápida
-    document.querySelectorAll('.assign-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const analystId = parseInt(this.getAttribute('data-id'));
-            const input = document.querySelector(`.quick-input[data-id="${analystId}"]`);
-            const ticketNumber = input?.value.trim();
-            
-            if (ticketNumber) {
-                assignTicketToAnalyst(analystId, ticketNumber, 'normal');
-                if (input) input.value = '';
-            } else {
-                showNotification('Digite o número do ticket', 'warning');
-                if (input) input.focus();
-            }
-        });
-    });
-    
     // Inputs de atribuição rápida (Enter)
     document.querySelectorAll('.quick-input').forEach(input => {
         input.addEventListener('keypress', function(e) {
@@ -1294,29 +1015,6 @@ function attachCardEvents() {
                     this.value = '';
                 }
             }
-        });
-    });
-    
-    // Botões em cards ocupados
-    document.querySelectorAll('.wait-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const analystId = parseInt(this.getAttribute('data-id'));
-            setTicketWaiting(analystId);
-        });
-    });
-    
-    document.querySelectorAll('.finish-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const analystId = parseInt(this.getAttribute('data-id'));
-            finishTicket(analystId);
-        });
-    });
-    
-    // Botões de retomar
-    document.querySelectorAll('.resume-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const analystId = parseInt(this.getAttribute('data-id'));
-            resumeTicket(analystId);
         });
     });
 }
@@ -1383,6 +1081,99 @@ async function handleSpecialTicket(ticketNumber, ticketType) {
     // Atribuir ticket especial
     await assignTicketToAnalyst(analyst.id, ticketNumber, ticketType);
     return true;
+}
+
+// ============================================
+// FUNÇÕES DE CONTROLE
+// ============================================
+
+async function freeAllAnalysts() {
+    if (!confirm('Liberar TODOS os analistas?\n\nIsso finalizará todos os atendimentos.')) {
+        return;
+    }
+    
+    // Salvar tickets no Firebase
+    window.analysts.forEach(analyst => {
+        if (analyst.currentTicket && window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+            window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
+        }
+    });
+    
+    // Resetar todos os analistas
+    window.analysts.forEach(analyst => {
+        analyst.isBusy = false;
+        analyst.currentTicket = null;
+        analyst.ticketStatus = null;
+        analyst.ticketSpecialType = null;
+        analyst.isWaitingForClient = false;
+        analyst.inQueue = analyst.level === "N1";
+    });
+    
+    updateQueueOrder();
+    updateStatistics();
+    createAnalystStatusColumns();
+    updateSpecialCasesDisplay();
+    
+    await saveState();
+    
+    showNotification('Todos os analistas foram liberados', 'success');
+}
+
+async function resetQueue() {
+    if (!confirm('Reiniciar a fila do dia?\n\nIsso irá zerar todos os contadores e liberar analistas.')) {
+        return;
+    }
+    
+    // Finalizar tickets no Firebase
+    window.analysts.forEach(analyst => {
+        if (analyst.currentTicket && window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
+            window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
+        }
+    });
+    
+    // Resetar estado
+    appState.ticketsToday = 0;
+    appState.specialTicketsToday = 0;
+    appState.waitingTicketsToday = 0;
+    appState.lastReset = new Date().toLocaleDateString('pt-BR');
+    appState.queueOrder = [];
+    appState.nextTicketNumber = 1000;
+    
+    // Resetar analistas
+    window.analysts.forEach(analyst => {
+        analyst.ticketsHandled = 0;
+        analyst.isBusy = false;
+        analyst.currentTicket = null;
+        analyst.ticketStatus = null;
+        analyst.ticketSpecialType = null;
+        analyst.isWaitingForClient = false;
+        analyst.inQueue = analyst.level === "N1";
+        analyst.lastActivity = null;
+    });
+    
+    updateQueueOrder();
+    updateStatistics();
+    createAnalystStatusColumns();
+    updateSpecialCasesDisplay();
+    
+    await saveState();
+    
+    showNotification('Fila reiniciada para o novo dia!', 'success');
+}
+
+function nextAnalyst() {
+    if (appState.queueOrder.length === 0) {
+        showNotification('Não há analistas na fila', 'warning');
+        return;
+    }
+    
+    // Rotacionar fila
+    const first = appState.queueOrder.shift();
+    appState.queueOrder.push(first);
+    
+    updateStatistics();
+    showNotification(`Próximo: ${appState.queueOrder[0]?.name || 'Nenhum'}`, 'info');
+    saveState();
 }
 
 // ============================================
@@ -1573,76 +1364,5 @@ window.appController = {
     updateStatistics: updateStatistics,
     createAnalystStatusColumns: createAnalystStatusColumns
 };
-
-// ============================================
-// FORÇAR ATUALIZAÇÃO DA INTERFACE
-// ============================================
-
-// Atualizar interface após carregamento
-function forceInterfaceUpdate() {
-    if (window.analysts && window.analysts.length > 0) {
-        createAnalystStatusColumns();
-        updateSpecialCasesDisplay();
-        updateStatistics();
-        updateLastUpdateTime();
-        
-        // Atualizar sessão no rodapé
-        const sessionElement = document.getElementById('sessionId');
-        if (sessionElement && appState.sessionId) {
-            sessionElement.textContent = appState.sessionId.substring(0, 12) + '...';
-        }
-        
-        console.log('✅ Interface atualizada');
-    } else {
-        console.error('❌ Analistas não carregados');
-        // Tentar recarregar após 2 segundos
-        setTimeout(() => {
-            if (window.analysts && window.analysts.length > 0) {
-                forceInterfaceUpdate();
-            }
-        }, 2000);
-    }
-}
-
-// Adicionar chamada no initializeApp:
-async function initializeApp() {
-    try {
-        // 1. Carregar estado salvo
-        await loadSavedState();
-        
-        // 2. Atualizar interface
-        updateCurrentTime();
-        updateAnalystAvailability();
-        updateQueueOrder();
-        createAnalystStatusColumns();
-        updateSpecialCasesDisplay();
-        updateStatistics();
-        updateLastUpdateTime();
-        
-        // 3. Configurar eventos
-        setupEventListeners();
-        
-        // 4. Configurar auto-salvamento
-        setupAutoSave();
-        
-        // 5. Configurar auto-refresh
-        setupAutoRefresh();
-        
-        // 6. Verificar reset diário
-        checkDailyReset();
-        
-        // 7. Focar no input
-        focusMainInput();
-        
-        // 8. Forçar atualização final
-        setTimeout(forceInterfaceUpdate, 1000);
-        
-        showNotification('Sistema carregado com sucesso!', 'success');
-        
-    } catch (error) {
-        console.error('❌ Erro na inicialização:', error);
-        showError('Erro ao inicializar: ' + error.message);
-    }
-}
 
 console.log('✅ app.js v3.5.0 carregado com sucesso');
