@@ -10,8 +10,8 @@
 // CONFIGURAÇÃO GLOBAL
 // ============================================
 
-// Analistas
-window.analysts = [
+// Analistas base
+const BASE_ANALYSTS = [
     { id: 1, name: "Eric", level: "N1", startTime: 8, endTime: 17, isAvailable: false, isBusy: false, currentTicket: null, ticketStatus: null, specialClient: "TIM", inQueue: true, ticketsHandled: 0, lastActivity: null, isWaitingForClient: false },
     { id: 2, name: "Carolina", level: "N1", startTime: 9, endTime: 18, isAvailable: false, isBusy: false, currentTicket: null, ticketStatus: null, specialClient: null, inQueue: true, ticketsHandled: 0, lastActivity: null, isWaitingForClient: false },
     { id: 3, name: "Tamiris", level: "N1", startTime: 9, endTime: 18, isAvailable: false, isBusy: false, currentTicket: null, ticketStatus: null, specialClient: null, inQueue: true, ticketsHandled: 0, lastActivity: null, isWaitingForClient: false },
@@ -24,7 +24,7 @@ window.analysts = [
 ];
 
 // Clientes especiais
-window.specialClients = [
+const SPECIAL_CLIENTS = [
     { client: "Benoit", analyst: "André", level: "N1" },
     { client: "TIM", analyst: "Eric", level: "N1" },
     { client: "DPSP", analyst: "Felipe", level: "N1" }
@@ -42,8 +42,12 @@ let appState = {
     dailyResetDone: false,
     sessionId: null,
     firebaseStatus: 'checking',
-    lastSaveTime: null
+    lastSaveTime: null,
+    version: '3.5.0'
 };
+
+// Analistas atuais (serão inicializados)
+let currentAnalysts = [];
 
 // ============================================
 // INICIALIZAÇÃO
@@ -79,6 +83,9 @@ function initializeAppSync() {
         // Gerar ID de sessão
         appState.sessionId = generateSessionId();
         sessionStorage.setItem('queue_session_id', appState.sessionId);
+        
+        // Inicializar analistas com base
+        currentAnalysts = JSON.parse(JSON.stringify(BASE_ANALYSTS));
         
         // Atualizar interface básica
         updateCurrentTime();
@@ -176,8 +183,8 @@ async function loadSavedState() {
         // Tentar Firebase primeiro
         if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
             const savedState = await window.firebaseAppIntegration.loadFullState();
-            if (savedState) {
-                restoreFromFirebaseState(savedState);
+            if (savedState && savedState.appState) {
+                restoreFromSavedState(savedState);
                 appState.firebaseStatus = 'connected';
                 console.log('✅ Estado carregado do Firebase');
                 loaded = true;
@@ -190,8 +197,18 @@ async function loadSavedState() {
     // Fallback para localStorage
     if (!loaded) {
         loaded = loadFromLocalStorage();
-        appState.firebaseStatus = 'disconnected';
-        console.log('📱 Estado carregado do localStorage');
+        if (loaded) {
+            appState.firebaseStatus = 'disconnected';
+            console.log('📱 Estado carregado do localStorage');
+        }
+    }
+    
+    // Se não carregou nada, usar estado padrão
+    if (!loaded) {
+        console.log('🆕 Usando estado padrão');
+        currentAnalysts = JSON.parse(JSON.stringify(BASE_ANALYSTS));
+        resetAppState();
+        loaded = true;
     }
     
     return loaded;
@@ -204,13 +221,14 @@ async function saveState() {
     
     try {
         // Salvar localmente PRIMEIRO (mais rápido)
-        saveToLocalStorage(stateToSave);
+        const localSuccess = saveToLocalStorage(stateToSave);
         
         // Salvar no Firebase se disponível
+        let firebaseSuccess = false;
         if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
             try {
-                const success = await window.firebaseAppIntegration.saveFullState(stateToSave);
-                if (success) {
+                firebaseSuccess = await window.firebaseAppIntegration.saveFullState(stateToSave);
+                if (firebaseSuccess) {
                     appState.firebaseStatus = 'connected';
                     appState.lastSaveTime = new Date();
                     console.log('✅ Estado salvo no Firebase');
@@ -224,7 +242,7 @@ async function saveState() {
             }
         }
         
-        return true;
+        return localSuccess || firebaseSuccess;
     } catch (error) {
         console.error('❌ Erro ao salvar estado:', error);
         return false;
@@ -232,6 +250,24 @@ async function saveState() {
 }
 
 function prepareStateForSave() {
+    const analystsForSave = currentAnalysts.map(analyst => ({
+        id: analyst.id,
+        name: analyst.name,
+        level: analyst.level,
+        startTime: analyst.startTime,
+        endTime: analyst.endTime,
+        isAvailable: analyst.isAvailable,
+        isBusy: analyst.isBusy,
+        currentTicket: analyst.currentTicket,
+        ticketStatus: analyst.ticketStatus,
+        ticketSpecialType: analyst.ticketSpecialType,
+        ticketsHandled: analyst.ticketsHandled,
+        isWaitingForClient: analyst.isWaitingForClient,
+        inQueue: analyst.inQueue,
+        specialClient: analyst.specialClient,
+        lastActivity: analyst.lastActivity ? analyst.lastActivity.toISOString() : null
+    }));
+    
     return {
         appState: {
             ticketsToday: appState.ticketsToday,
@@ -241,25 +277,10 @@ function prepareStateForSave() {
             nextTicketNumber: appState.nextTicketNumber,
             simulatedTime: appState.simulatedTime ? appState.simulatedTime.getTime() : null,
             lastSaveTime: new Date().toISOString(),
-            sessionId: appState.sessionId
+            sessionId: appState.sessionId,
+            version: appState.version
         },
-        analysts: window.analysts.map(a => ({
-            id: a.id,
-            name: a.name,
-            level: a.level,
-            startTime: a.startTime,
-            endTime: a.endTime,
-            isAvailable: a.isAvailable,
-            isBusy: a.isBusy,
-            currentTicket: a.currentTicket,
-            ticketStatus: a.ticketStatus,
-            ticketSpecialType: a.ticketSpecialType,
-            ticketsHandled: a.ticketsHandled,
-            isWaitingForClient: a.isWaitingForClient,
-            inQueue: a.inQueue,
-            specialClient: a.specialClient,
-            lastActivity: a.lastActivity ? a.lastActivity.toISOString() : null
-        })),
+        analysts: analystsForSave,
         queueOrder: appState.queueOrder.map(a => a.id),
         sessionId: appState.sessionId,
         version: '3.5.0',
@@ -267,8 +288,8 @@ function prepareStateForSave() {
     };
 }
 
-function restoreFromFirebaseState(savedState) {
-    if (!savedState) return false;
+function restoreFromSavedState(savedState) {
+    if (!savedState || !savedState.appState) return false;
     
     try {
         // Restaurar appState
@@ -279,53 +300,41 @@ function restoreFromFirebaseState(savedState) {
             appState.lastReset = savedState.appState.lastReset || new Date().toLocaleDateString('pt-BR');
             appState.nextTicketNumber = savedState.appState.nextTicketNumber || 1000;
             appState.sessionId = savedState.appState.sessionId || appState.sessionId;
+            appState.version = savedState.appState.version || '3.5.0';
             
             if (savedState.appState.simulatedTime) {
                 appState.simulatedTime = new Date(savedState.appState.simulatedTime);
-            }
-            
-            if (savedState.appState.lastSaveTime) {
-                appState.lastSaveTime = new Date(savedState.appState.lastSaveTime);
             }
         }
         
         // Restaurar analistas
         if (savedState.analysts && Array.isArray(savedState.analysts)) {
-            savedState.analysts.forEach(savedAnalyst => {
-                const analyst = window.analysts.find(a => a.id === savedAnalyst.id);
-                if (analyst) {
-                    analyst.isAvailable = savedAnalyst.isAvailable !== undefined ? savedAnalyst.isAvailable : false;
-                    analyst.isBusy = savedAnalyst.isBusy || false;
-                    analyst.currentTicket = savedAnalyst.currentTicket || null;
-                    analyst.ticketStatus = savedAnalyst.ticketStatus || null;
-                    analyst.ticketSpecialType = savedAnalyst.ticketSpecialType || null;
-                    analyst.ticketsHandled = savedAnalyst.ticketsHandled || 0;
-                    analyst.isWaitingForClient = savedAnalyst.isWaitingForClient || false;
-                    analyst.inQueue = savedAnalyst.inQueue !== undefined ? savedAnalyst.inQueue : true;
-                    
-                    if (savedAnalyst.lastActivity) {
-                        analyst.lastActivity = new Date(savedAnalyst.lastActivity);
-                    }
-                }
-            });
+            currentAnalysts = savedState.analysts.map(savedAnalyst => {
+                const baseAnalyst = BASE_ANALYSTS.find(a => a.id === savedAnalyst.id);
+                if (!baseAnalyst) return null;
+                
+                return {
+                    ...baseAnalyst,
+                    isAvailable: savedAnalyst.isAvailable !== undefined ? savedAnalyst.isAvailable : false,
+                    isBusy: savedAnalyst.isBusy || false,
+                    currentTicket: savedAnalyst.currentTicket || null,
+                    ticketStatus: savedAnalyst.ticketStatus || null,
+                    ticketSpecialType: savedAnalyst.ticketSpecialType || null,
+                    ticketsHandled: savedAnalyst.ticketsHandled || 0,
+                    isWaitingForClient: savedAnalyst.isWaitingForClient || false,
+                    inQueue: savedAnalyst.inQueue !== undefined ? savedAnalyst.inQueue : true,
+                    specialClient: savedAnalyst.specialClient || null,
+                    lastActivity: savedAnalyst.lastActivity ? new Date(savedAnalyst.lastActivity) : null
+                };
+            }).filter(a => a);
         }
         
-        // Restaurar fila
-        if (savedState.queueOrder && Array.isArray(savedState.queueOrder)) {
-            appState.queueOrder = savedState.queueOrder.map(id => 
-                window.analysts.find(a => a.id === id)
-            ).filter(a => a);
-        }
-        
-        // Restaurar sessionId
-        if (savedState.sessionId) {
-            appState.sessionId = savedState.sessionId;
-            sessionStorage.setItem('queue_session_id', savedState.sessionId);
-        }
+        // Reconstruir fila
+        updateQueueOrder();
         
         return true;
     } catch (error) {
-        console.error('❌ Erro ao restaurar estado do Firebase:', error);
+        console.error('❌ Erro ao restaurar estado:', error);
         return false;
     }
 }
@@ -346,13 +355,23 @@ function loadFromLocalStorage() {
         const saved = localStorage.getItem('queue_state');
         if (saved) {
             const state = JSON.parse(saved);
-            return restoreFromFirebaseState(state);
+            return restoreFromSavedState(state);
         }
         return false;
     } catch (error) {
         console.error('❌ Erro ao carregar do localStorage:', error);
         return false;
     }
+}
+
+function resetAppState() {
+    appState.ticketsToday = 0;
+    appState.specialTicketsToday = 0;
+    appState.waitingTicketsToday = 0;
+    appState.lastReset = new Date().toLocaleDateString('pt-BR');
+    appState.queueOrder = [];
+    appState.nextTicketNumber = 1000;
+    appState.dailyResetDone = false;
 }
 
 // ============================================
@@ -370,19 +389,19 @@ function createAnalystStatusColumns() {
     updateAnalystStatusFlags();
     
     // Filtrar analistas
-    const availableAnalysts = window.analysts.filter(a => 
+    const availableAnalysts = currentAnalysts.filter(a => 
         a.level === "N1" && a.isAvailable && !a.isBusy && !a.currentTicket && !a.isWaitingForClient
     );
     
-    const busyAnalysts = window.analysts.filter(a => 
+    const busyAnalysts = currentAnalysts.filter(a => 
         a.level === "N1" && a.isAvailable && (a.isBusy || a.currentTicket) && !a.isWaitingForClient
     );
     
-    const waitingAnalysts = window.analysts.filter(a => 
+    const waitingAnalysts = currentAnalysts.filter(a => 
         a.level === "N1" && a.isAvailable && a.isWaitingForClient
     );
     
-    const offlineAnalysts = window.analysts.filter(a => 
+    const offlineAnalysts = currentAnalysts.filter(a => 
         a.level === "N1" && !a.isAvailable
     );
     
@@ -563,7 +582,7 @@ function createAnalystCardHTML(analyst, status) {
 // ============================================
 
 async function assignTicketToAnalyst(analystId, ticketNumber, ticketType = 'normal') {
-    const analyst = window.analysts.find(a => a.id === analystId);
+    const analyst = currentAnalysts.find(a => a.id === analystId);
     if (!analyst) {
         showNotification('Analista não encontrado', 'error');
         return;
@@ -630,7 +649,7 @@ async function assignTicketToAnalyst(analystId, ticketNumber, ticketType = 'norm
 }
 
 async function finishTicket(analystId) {
-    const analyst = window.analysts.find(a => a.id === analystId);
+    const analyst = currentAnalysts.find(a => a.id === analystId);
     if (!analyst) {
         showNotification('Analista não encontrado', 'error');
         return;
@@ -669,7 +688,7 @@ async function finishTicket(analystId) {
 }
 
 async function setTicketWaiting(analystId) {
-    const analyst = window.analysts.find(a => a.id === analystId);
+    const analyst = currentAnalysts.find(a => a.id === analystId);
     if (!analyst) {
         showNotification('Analista não encontrado', 'error');
         return;
@@ -706,7 +725,7 @@ async function setTicketWaiting(analystId) {
 }
 
 async function resumeTicket(analystId) {
-    const analyst = window.analysts.find(a => a.id === analystId);
+    const analyst = currentAnalysts.find(a => a.id === analystId);
     if (!analyst) {
         showNotification('Analista não encontrado', 'error');
         return;
@@ -770,7 +789,7 @@ function updateAnalystAvailability() {
     let needsRefresh = false;
     let needsSave = false;
     
-    window.analysts.forEach(analyst => {
+    currentAnalysts.forEach(analyst => {
         const newAvailability = (currentTime >= analyst.startTime && currentTime < analyst.endTime);
         
         if (analyst.isAvailable !== newAvailability) {
@@ -796,7 +815,7 @@ function updateAnalystAvailability() {
         updateSpecialCasesDisplay();
         
         if (needsSave) {
-            saveState(); // Não precisa await aqui
+            saveState();
         }
     }
 }
@@ -807,7 +826,7 @@ function updateAnalystStatusFlags() {
     const currentMinutes = now.getMinutes();
     const currentTime = currentHour + currentMinutes / 100;
     
-    window.analysts.forEach(analyst => {
+    currentAnalysts.forEach(analyst => {
         // Atualizar disponibilidade por horário
         const shouldBeAvailable = (currentTime >= analyst.startTime && currentTime < analyst.endTime);
         
@@ -828,7 +847,7 @@ function updateAnalystStatusFlags() {
 }
 
 function updateQueueOrder() {
-    const queueEligible = window.analysts.filter(a => 
+    const queueEligible = currentAnalysts.filter(a => 
         a.level === "N1" && a.isAvailable && ((!a.isBusy && a.inQueue) || a.isWaitingForClient)
     );
     
@@ -843,10 +862,10 @@ function updateStatistics() {
     updateElementText('totalTickets', appState.ticketsToday);
     updateElementText('specialTickets', appState.specialTicketsToday);
     
-    const available = window.analysts.filter(a => a.isAvailable && !a.isBusy && !a.currentTicket).length;
+    const available = currentAnalysts.filter(a => a.isAvailable && !a.isBusy && !a.currentTicket).length;
     updateElementText('availableAnalystsStat', available);
     
-    const waiting = window.analysts.filter(a => a.isWaitingForClient).length;
+    const waiting = currentAnalysts.filter(a => a.isWaitingForClient).length;
     updateElementText('waitingTickets', waiting);
     appState.waitingTicketsToday = waiting;
     
@@ -856,7 +875,7 @@ function updateStatistics() {
     updateElementText('lastResetDate', appState.lastReset);
     
     // Atualizar contador de analistas
-    updateElementText('analystCount', `${window.analysts.length} analistas`);
+    updateElementText('analystCount', `${currentAnalysts.length} analistas`);
 }
 
 function updateSpecialCasesDisplay() {
@@ -865,8 +884,8 @@ function updateSpecialCasesDisplay() {
     
     let html = '';
     
-    window.specialClients.forEach(special => {
-        const analyst = window.analysts.find(a => a.name === special.analyst);
+    SPECIAL_CLIENTS.forEach(special => {
+        const analyst = currentAnalysts.find(a => a.name === special.analyst);
         let status = 'INDISPONÍVEL';
         let statusClass = 'offline';
         let details = '';
@@ -982,7 +1001,7 @@ function generateSessionId() {
 }
 
 function isTicketAlreadyExists(ticketNumber) {
-    return window.analysts.some(a => a.currentTicket === ticketNumber);
+    return currentAnalysts.some(a => a.currentTicket === ticketNumber);
 }
 
 function focusMainInput() {
@@ -1097,13 +1116,13 @@ async function handleNewTicket() {
 }
 
 async function handleSpecialTicket(ticketNumber, ticketType) {
-    const specialClient = window.specialClients.find(c => c.client === ticketType);
+    const specialClient = SPECIAL_CLIENTS.find(c => c.client === ticketType);
     if (!specialClient) {
         showNotification('Cliente especial não encontrado', 'error');
         return false;
     }
     
-    const analyst = window.analysts.find(a => a.name === specialClient.analyst);
+    const analyst = currentAnalysts.find(a => a.name === specialClient.analyst);
     if (!analyst) {
         showNotification('Analista não encontrado', 'error');
         return false;
@@ -1140,7 +1159,7 @@ async function freeAllAnalysts() {
     }
     
     // Finalizar tickets no Firebase
-    const promises = window.analysts.map(analyst => {
+    const promises = currentAnalysts.map(analyst => {
         if (analyst.currentTicket && window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
             return window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
         }
@@ -1150,7 +1169,7 @@ async function freeAllAnalysts() {
     await Promise.all(promises);
     
     // Resetar todos os analistas
-    window.analysts.forEach(analyst => {
+    currentAnalysts.forEach(analyst => {
         analyst.isBusy = false;
         analyst.currentTicket = null;
         analyst.ticketStatus = null;
@@ -1181,7 +1200,7 @@ async function resetQueue() {
     }
     
     // Finalizar tickets no Firebase
-    const promises = window.analysts.map(analyst => {
+    const promises = currentAnalysts.map(analyst => {
         if (analyst.currentTicket && window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
             return window.firebaseAppIntegration.updateTicketStatus(analyst.currentTicket, 'finalizado', analyst.name);
         }
@@ -1191,25 +1210,11 @@ async function resetQueue() {
     await Promise.all(promises);
     
     // Resetar estado
-    appState.ticketsToday = 0;
-    appState.specialTicketsToday = 0;
-    appState.waitingTicketsToday = 0;
-    appState.lastReset = new Date().toLocaleDateString('pt-BR');
-    appState.queueOrder = [];
-    appState.nextTicketNumber = 1000;
+    resetAppState();
     appState.dailyResetDone = true;
     
-    // Resetar analistas
-    window.analysts.forEach(analyst => {
-        analyst.ticketsHandled = 0;
-        analyst.isBusy = false;
-        analyst.currentTicket = null;
-        analyst.ticketStatus = null;
-        analyst.ticketSpecialType = null;
-        analyst.isWaitingForClient = false;
-        analyst.inQueue = analyst.level === "N1";
-        analyst.lastActivity = null;
-    });
+    // Resetar analistas (mantém dados base)
+    currentAnalysts = JSON.parse(JSON.stringify(BASE_ANALYSTS));
     
     // Atualizar interface
     updateQueueOrder();
@@ -1428,7 +1433,7 @@ window.testPersistence = async function() {
     
     // 1. Verificar estado atual
     console.log('📊 Estado atual:');
-    window.analysts.forEach(a => {
+    currentAnalysts.forEach(a => {
         if (a.currentTicket) {
             console.log(`  ${a.name}: ${a.currentTicket} (${a.ticketStatus})`);
         }
@@ -1466,7 +1471,7 @@ window.testPersistence = async function() {
 
 // Log periódico para diagnóstico (opcional)
 setInterval(() => {
-    const activeTickets = window.analysts.filter(a => a.currentTicket);
+    const activeTickets = currentAnalysts.filter(a => a.currentTicket);
     if (activeTickets.length > 0) {
         console.log('🔄 Tickets ativos:', activeTickets.map(a => 
             `${a.name}: ${a.currentTicket}`
@@ -1480,7 +1485,7 @@ setInterval(() => {
 
 window.appController = {
     appState: appState,
-    analysts: window.analysts,
+    analysts: currentAnalysts,
     saveState: saveState,
     showNotification: showNotification,
     updateStatistics: updateStatistics,
