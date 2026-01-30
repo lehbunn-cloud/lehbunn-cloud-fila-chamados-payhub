@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Fila de Chamados - Payhub</title>
+    <title>Portal Payhub - Fila de Chamados</title>
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -11,383 +11,238 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- Estilos -->
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        .hero-section {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .hero-container {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+            color: white;
+        }
+        
+        .hero-title {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .hero-subtitle {
+            font-size: 20px;
+            opacity: 0.9;
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .access-options {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 50px;
+            flex-wrap: wrap;
+        }
+        
+        .access-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 40px 30px;
+            width: 350px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .access-card:hover {
+            transform: translateY(-10px);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .access-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: white;
+        }
+        
+        .access-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .access-description {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+        
+        .access-card.analyst {
+            border-top: 5px solid #4CAF50;
+        }
+        
+        .access-card.admin {
+            border-top: 5px solid #FF9800;
+        }
+        
+        .access-btn {
+            display: inline-block;
+            padding: 12px 30px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .access-btn.analyst {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .access-btn.analyst:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .access-btn.admin {
+            background: #FF9800;
+            color: white;
+        }
+        
+        .access-btn.admin:hover {
+            background: #f57c00;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.3);
+        }
+        
+        .version-info {
+            margin-top: 50px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 36px;
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .access-options {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .access-card {
+                width: 100%;
+                max-width: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Página inicial de acesso -->
+    <div class="hero-section">
+        <div class="hero-container">
+            <div class="hero-title">
+                <i class="fas fa-headset"></i>
+                Portal Payhub - Fila de Chamados
+            </div>
+            
+            <div class="hero-subtitle">
+                Sistema de gerenciamento de atendimentos com visualização em tempo real
+                e controle administrativo completo
+            </div>
+            
+            <div class="access-options">
+                <!-- Acesso para Analistas (consulta) -->
+                <div class="access-card analyst">
+                    <div class="access-icon">
+                        <i class="fas fa-eye"></i>
+                    </div>
+                    <div class="access-title">
+                        Área de Consulta
+                    </div>
+                    <div class="access-description">
+                        Acesso rápido para visualização do status dos analistas,
+                        fila de chamados e informações em tempo real. Não requer login.
+                    </div>
+                    <a href="analyst-view.html" class="access-btn analyst">
+                        <i class="fas fa-arrow-right"></i>
+                        Acessar como Analista
+                    </a>
+                </div>
+                
+                <!-- Acesso para Administradores -->
+                <div class="access-card admin">
+                    <div class="access-icon">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <div class="access-title">
+                        Área Administrativa
+                    </div>
+                    <div class="access-description">
+                        Controle completo da fila, gestão de analistas,
+                        relatórios e configurações do sistema. Requer autenticação.
+                    </div>
+                    <a href="login.html" class="access-btn admin">
+                        <i class="fas fa-lock"></i>
+                        Acessar como Administrador
+                    </a>
+                </div>
+            </div>
+            
+            <div class="version-info">
+                <p>Sistema v3.5.0 | Desenvolvido para Equipe Payhub</p>
+                <p>Status Firebase: <span id="firebaseStatus">Conectando...</span></p>
+            </div>
+        </div>
+    </div>
+    
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     
-    <!-- Estilos -->
-    <link rel="stylesheet" href="style.css">
-    
-    <style>
-        .firebase-status {
-            display: inline-flex;
-            align-items: center;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            margin-left: 10px;
-            font-weight: 500;
-        }
-        .firebase-status.connected {
-            background: #E8F5E9;
-            color: #2E7D32;
-            border: 1px solid #C8E6C9;
-        }
-        .firebase-status.disconnected {
-            background: #FFEBEE;
-            color: #C62828;
-            border: 1px solid #FFCDD2;
-        }
-        .last-saved {
-            font-size: 11px;
-            color: #666;
-            margin-left: 10px;
-        }
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.9);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-        }
-        .loading-spinner-large {
-            width: 50px;
-            height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 15px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
-</head>
-<body>
-    <!-- Overlay de carregamento -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-spinner-large"></div>
-        <div style="font-size: 14px; color: #333; margin-top: 10px;">Inicializando sistema...</div>
-        <div id="loadingStatus" style="font-size: 12px; color: #666; margin-top: 5px;">Conectando ao Firebase</div>
-    </div>
-
-    <div class="container">
-        <!-- Cabeçalho -->
-        <div class="header">
-            <div class="header-content">
-                <h1>
-                    <i class="fas fa-headset"></i>
-                    Portal de Fila de Chamados - Payhub
-                    <span id="versionBadge" class="version-badge">v3.5.0</span>
-                </h1>
-                <p>Controle de atendimentos com persistência completa em Firebase</p>
-            </div>
-            <div class="header-right">
-                <div id="firebaseStatus" class="firebase-status">
-                    <i class="fas fa-circle"></i>
-                    <span>Conectando...</span>
-                </div>
-                <div id="lastSaved" class="last-saved" style="display: none;">
-                    <i class="far fa-clock"></i>
-                    <span>Salvo: --:--:--</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Menu de navegação -->
-        <div class="nav-menu">
-            <a href="index.html" class="nav-link active">
-                <i class="fas fa-home"></i>
-                Painel Principal
-            </a>
-            <a href="analyst-view.html" class="nav-link">
-                <i class="fas fa-eye"></i>
-                Visualização
-            </a>
-            <a href="admin.html" class="nav-link">
-                <i class="fas fa-cogs"></i>
-                Administração
-            </a>
-        </div>
-        
-        <!-- Painel de tempo -->
-        <div class="time-panel">
-            <div class="time-info">
-                <i class="fas fa-clock"></i>
-                <div class="time-text">
-                    <div class="time-date" id="currentDate">Carregando data...</div>
-                    <div class="time-clock" id="currentTime">Carregando hora...</div>
-                </div>
-            </div>
-            <div id="simulationIndicator" class="simulation-indicator" style="display: none;">
-                <i class="fas fa-magic"></i>
-                Horário simulado
-            </div>
-        </div>
-        
-        <!-- COLUNAS DE STATUS DOS ANALISTAS -->
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-columns"></i>
-                Status dos Analistas
-                <span id="analystCount" class="counter-badge">9 analistas</span>
-            </div>
-            <div id="analystStatusColumns">
-                <div class="loading">
-                    <div class="loading-spinner"></div>
-                    <span>Carregando status dos analistas...</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Clientes Especiais -->
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-star"></i>
-                Clientes Especiais
-            </div>
-            <div id="specialCases">
-                <div class="loading">
-                    <div class="loading-spinner"></div>
-                    <span>Carregando clientes especiais...</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Estatísticas -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="totalTickets">0</div>
-                <div class="stat-label">Chamados Hoje</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="availableAnalystsStat">0</div>
-                <div class="stat-label">Analistas Disponíveis</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="nextInQueue">-</div>
-                <div class="stat-label">Próximo na Fila</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="specialTickets">0</div>
-                <div class="stat-label">Casos Especiais</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="waitingTickets">0</div>
-                <div class="stat-label">Aguardando Cliente</div>
-            </div>
-        </div>
-        
-        <!-- Painel de controles -->
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-plus-circle"></i>
-                Novo Chamado - Clientes Especiais
-            </div>
-            <div class="control-group">
-                <input type="text" id="newTicketNumber" class="input-field" 
-                       placeholder="Número do chamado para cliente especial"
-                       autocomplete="off" autofocus>
-                <select id="ticketType" class="input-field">
-                    <option value="TIM">Cliente TIM (Eric)</option>
-                    <option value="DPSP">Cliente DPSP (Felipe)</option>
-                    <option value="Benoit">Cliente Benoit (André)</option>
-                </select>
-                <button class="btn btn-success" id="addTicketBtn">
-                    <i class="fas fa-plus"></i>
-                    Adicionar Chamado Especial
-                </button>
-            </div>
-            <div class="info-box">
-                <i class="fas fa-info-circle"></i>
-                <strong>Informação:</strong> Use os inputs nos cards dos analistas disponíveis para atribuição rápida de chamados normais. Para clientes especiais, use este painel.
-            </div>
-        </div>
-        
-        <!-- Controles da Fila -->
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-cogs"></i>
-                Controles da Fila
-            </div>
-            <div class="control-group">
-                <button class="btn" id="nextAnalystBtn">
-                    <i class="fas fa-forward"></i>
-                    Avançar Fila
-                </button>
-                <button class="btn btn-warning" id="resetQueueBtn">
-                    <i class="fas fa-redo-alt"></i>
-                    Reiniciar Dia
-                </button>
-                <button class="btn btn-danger" id="freeAllBtn">
-                    <i class="fas fa-user-check"></i>
-                    Liberar Todos
-                </button>
-                <button class="btn" id="simulateTimeBtn">
-                    <i class="fas fa-magic"></i>
-                    Simular Horário
-                </button>
-                <button class="btn btn-cyan" id="realTimeBtn" style="display: none;">
-                    <i class="fas fa-clock"></i>
-                    Voltar ao Horário Real
-                </button>
-                <button class="btn" id="generateReportBtn">
-                    <i class="fas fa-file-csv"></i>
-                    Gerar Relatório
-                </button>
-                <button class="btn btn-test" id="testFirebaseBtn">
-                    <i class="fas fa-vial"></i>
-                    Testar Firebase
-                </button>
-            </div>
-        </div>
-        
-        <!-- Rodapé -->
-        <div class="footer">
-            <p><strong>Portal de Fila de Chamados - Equipe Payhub v3.5.0</strong> | Sistema com persistência completa Firebase</p>
-            <p>Última atualização: <span id="lastUpdate">--:--:--</span> | Sessão: <span id="sessionId">---</span></p>
-            <p class="last-reset">Fila reiniciada em: <span id="lastResetDate"></span></p>
-        </div>
-    </div>
-    
-    <!-- Modal de Simulação de Horário -->
-    <div id="timeSimulationModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-magic"></i>
-                    Simular Horário
-                </div>
-                <button class="close-modal" id="closeTimeModal">&times;</button>
-            </div>
-            <div class="modal-description">
-                <p>Selecione um horário para simular a disponibilidade dos analistas:</p>
-            </div>
-            <div class="time-options-grid">
-                <button class="time-option" data-hour="8">08:00</button>
-                <button class="time-option" data-hour="9">09:00</button>
-                <button class="time-option" data-hour="10">10:00</button>
-                <button class="time-option" data-hour="11">11:00</button>
-                <button class="time-option" data-hour="12">12:00</button>
-                <button class="time-option" data-hour="13">13:00</button>
-                <button class="time-option" data-hour="14">14:00</button>
-                <button class="time-option" data-hour="15">15:00</button>
-                <button class="time-option" data-hour="16">16:00</button>
-                <button class="time-option" data-hour="17">17:00</button>
-                <button class="time-option" data-hour="18">18:00</button>
-                <button class="time-option" data-hour="19">19:00</button>
-                <button class="time-option" data-hour="20">20:00</button>
-                <button class="time-option" data-hour="21">21:00</button>
-                <button class="time-option" data-hour="22">22:00</button>
-                <button class="time-option" data-hour="23">23:00</button>
-            </div>
-            <div class="modal-actions">
-                <button class="btn" id="cancelSimulation">Cancelar</button>
-                <button class="btn btn-success" id="applySimulation">Aplicar Simulação</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Modal de Relatórios -->
-    <div id="reportModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-file-csv"></i>
-                    Gerar Relatório
-                </div>
-                <button class="close-modal" id="closeReportModal">&times;</button>
-            </div>
-            <div class="modal-description">
-                <p>Selecione o período para gerar o relatório de chamados:</p>
-            </div>
-            <div class="modal-controls">
-                <div class="form-group">
-                    <label for="startDate">
-                        <i class="far fa-calendar-alt"></i>
-                        Data Inicial
-                    </label>
-                    <input type="date" id="startDate" class="input-field">
-                </div>
-                <div class="form-group">
-                    <label for="endDate">
-                        <i class="far fa-calendar-alt"></i>
-                        Data Final
-                    </label>
-                    <input type="date" id="endDate" class="input-field">
-                </div>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="includeAllTickets">
-                    <label for="includeAllTickets">Incluir todos os chamados (não apenas os especiais)</label>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn" id="cancelReport">Cancelar</button>
-                <button class="btn btn-success" id="generateCSV">Gerar CSV</button>
-            </div>
-        </div>
-    </div>
-    
     <!-- Scripts -->
     <script src="firebase-config.js"></script>
-    <script src="firebase-app.js"></script>
-    <script src="app.js"></script>
-    
     <script>
-    // Esconder overlay quando tudo estiver carregado
-    document.addEventListener('DOMContentLoaded', function() {
-        // Verificar se o app.js foi carregado corretamente
-        const checkAppLoaded = setInterval(() => {
-            if (typeof window.appController !== 'undefined') {
-                clearInterval(checkAppLoaded);
-                // Dar tempo extra para a interface carregar
-                setTimeout(() => {
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                }, 1000);
-            }
-        }, 500);
-        
-        // Timeout de segurança
-        setTimeout(() => {
-            document.getElementById('loadingOverlay').style.display = 'none';
-        }, 10000);
-    });
-</script>
-<script>
-    // Esconder overlay quando tudo estiver carregado
-    document.addEventListener('DOMContentLoaded', function() {
-        // Verificar se os analistas foram carregados
-        const checkAnalystsLoaded = setInterval(() => {
-            const analystContainer = document.getElementById('analystStatusColumns');
-            if (analystContainer && !analystContainer.innerHTML.includes('Carregando')) {
-                clearInterval(checkAnalystsLoaded);
-                // Dar tempo para animações
-                setTimeout(() => {
-                    const loadingOverlay = document.getElementById('loadingOverlay');
-                    if (loadingOverlay) {
-                        loadingOverlay.style.display = 'none';
-                    }
-                }, 500);
-            }
-        }, 500);
-        
-        // Timeout de segurança
-        setTimeout(() => {
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            if (loadingOverlay) {
-                loadingOverlay.style.display = 'none';
-            }
-        }, 5000);
-    });
-</script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Verificar status do Firebase
+            setTimeout(() => {
+                const firebaseApp = window.firebaseApp;
+                const statusElement = document.getElementById('firebaseStatus');
+                
+                if (firebaseApp && !firebaseApp.isMock) {
+                    statusElement.textContent = '✅ Conectado';
+                    statusElement.style.color = '#4CAF50';
+                } else if (firebaseApp?.isMock) {
+                    statusElement.textContent = '⚠️ Modo Offline';
+                    statusElement.style.color = '#FF9800';
+                } else {
+                    statusElement.textContent = '❌ Não conectado';
+                    statusElement.style.color = '#f44336';
+                }
+            }, 1000);
+        });
+    </script>
 </body>
 </html>
