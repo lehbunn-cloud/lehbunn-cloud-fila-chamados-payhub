@@ -258,13 +258,9 @@
         </div>
     </div>
     
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <!-- REMOVIDO: Firebase SDK duplicado -->
     
     <!-- Scripts -->
-    <script src="firebase-config.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const loginForm = document.getElementById('loginForm');
@@ -334,6 +330,14 @@
             
             // Focar no campo de usuário
             document.getElementById('username').focus();
+            
+            // Verificar status do Firebase (apenas para exibição)
+            setTimeout(() => {
+                const firebaseApp = window.firebaseApp;
+                if (firebaseApp && !firebaseApp.isMock) {
+                    console.log('✅ Firebase já inicializado anteriormente');
+                }
+            }, 500);
         });
     </script>
 </body>
