@@ -515,62 +515,87 @@
     <script src="firebase-config.js"></script>
     <script src="firebase-app.js"></script>
     <script>
-        // Verificar autenticação
+        // VERIFICAÇÃO DE AUTENTICAÇÃO SIMPLIFICADA
         document.addEventListener('DOMContentLoaded', function() {
-    const authOverlay = document.getElementById('authOverlay');
-    
-    // Verificar autenticação - CORRIGIDO
-    function checkAdminAuthentication() {
-        const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
-        const loginTime = sessionStorage.getItem('admin_login_time');
-        
-        if (!isAuthenticated || !loginTime) {
-            console.log('❌ Não autenticado, redirecionando...');
-            window.location.href = 'login.html';
-            return false;
-        }
-        
-        // Verificar se a sessão expirou (4 horas)
-        const loginDate = new Date(loginTime);
-        const now = new Date();
-        const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
-        
-        if (hoursDiff >= 4) {
-            console.log('⚠️ Sessão expirada');
-            sessionStorage.removeItem('admin_authenticated');
-            sessionStorage.removeItem('admin_username');
-            sessionStorage.removeItem('admin_login_time');
-            window.location.href = 'login.html';
-            return false;
-        }
-        
-        return true;
-    }
-    
-    // Verificar autenticação
-    if (!checkAdminAuthentication()) {
-        return;
-    }
-    
-    // Esconder overlay de autenticação
-    setTimeout(() => {
-        authOverlay.style.display = 'none';
-        
-        // Carregar dados do sistema
-        loadDashboard();
-        setupEventListeners();
-        
-        // Atualizar a cada 10 segundos
-        setInterval(loadDashboard, 10000);
-    }, 1000);
-    
-    // Carregar nome do admin
-    const adminUsername = sessionStorage.getItem('admin_username') || 'Administrador';
-    document.getElementById('adminUsername').textContent = adminUsername;
-});
+            console.log('=== DASHBOARD INICIALIZANDO ===');
+            
+            const authOverlay = document.getElementById('authOverlay');
+            
+            // Função de verificação direta
+            function checkAuthentication() {
+                const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+                const loginTime = sessionStorage.getItem('admin_login_time');
+                
+                console.log('Verificando sessão...', {
+                    isAuthenticated: isAuthenticated,
+                    loginTime: loginTime
+                });
+                
+                if (!isAuthenticated) {
+                    console.log('❌ Sessão não encontrada, redirecionando para login');
+                    window.location.href = 'login.html';
+                    return false;
+                }
+                
+                if (!loginTime) {
+                    console.log('❌ Tempo de login não encontrado, redirecionando');
+                    sessionStorage.removeItem('admin_authenticated');
+                    sessionStorage.removeItem('admin_username');
+                    window.location.href = 'login.html';
+                    return false;
+                }
+                
+                // Verificar se a sessão expirou (4 horas)
+                const loginDate = new Date(loginTime);
+                const now = new Date();
+                const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
+                
+                if (hoursDiff >= 4) {
+                    console.log('⚠️ Sessão expirada (' + hoursDiff.toFixed(2) + ' horas)');
+                    sessionStorage.removeItem('admin_authenticated');
+                    sessionStorage.removeItem('admin_username');
+                    sessionStorage.removeItem('admin_login_time');
+                    window.location.href = 'login.html';
+                    return false;
+                }
+                
+                console.log('✅ Sessão válida (' + hoursDiff.toFixed(2) + ' horas atrás)');
+                return true;
+            }
+            
+            // VERIFICAÇÃO IMEDIATA
+            if (!checkAuthentication()) {
+                return; // Para a execução se não estiver autenticado
+            }
+            
+            // SE AUTENTICADO, CONTINUAR
+            console.log('✅ Dashboard carregando para usuário autenticado');
+            
+            // Esconder overlay após pequeno delay
+            setTimeout(() => {
+                if (authOverlay) {
+                    authOverlay.style.display = 'none';
+                }
+                
+                // Carregar nome do admin
+                const adminUsername = sessionStorage.getItem('admin_username') || 'Administrador';
+                document.getElementById('adminUsername').textContent = adminUsername;
+                console.log('Usuário:', adminUsername);
+                
+                // Carregar dados do sistema
+                loadDashboard();
+                setupEventListeners();
+                
+                // Atualizar a cada 10 segundos
+                setInterval(loadDashboard, 10000);
+                
+            }, 500);
+        });
         
         function loadDashboard() {
             try {
+                console.log('Carregando dashboard...');
+                
                 // Carregar estado do sistema
                 const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
                 const savedAnalysts = savedState.analysts || [];
@@ -752,6 +777,7 @@
                 if (confirm('Deseja realmente sair do painel administrativo?')) {
                     sessionStorage.removeItem('admin_authenticated');
                     sessionStorage.removeItem('admin_username');
+                    sessionStorage.removeItem('admin_login_time');
                     window.location.href = 'login.html';
                 }
             });
