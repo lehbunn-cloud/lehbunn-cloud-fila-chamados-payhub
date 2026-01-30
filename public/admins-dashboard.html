@@ -517,30 +517,57 @@
     <script>
         // Verificar autenticação
         document.addEventListener('DOMContentLoaded', function() {
-            const authOverlay = document.getElementById('authOverlay');
-            
-            // Verificar se está autenticado
-            if (sessionStorage.getItem('admin_authenticated') !== 'true') {
-                window.location.href = 'login.html';
-                return;
-            }
-            
-            // Esconder overlay de autenticação
-            setTimeout(() => {
-                authOverlay.style.display = 'none';
-                
-                // Carregar dados do sistema
-                loadDashboard();
-                setupEventListeners();
-                
-                // Atualizar a cada 10 segundos
-                setInterval(loadDashboard, 10000);
-            }, 1000);
-            
-            // Carregar nome do admin
-            const adminUsername = sessionStorage.getItem('admin_username') || 'Administrador';
-            document.getElementById('adminUsername').textContent = adminUsername;
-        });
+    const authOverlay = document.getElementById('authOverlay');
+    
+    // Verificar autenticação - CORRIGIDO
+    function checkAdminAuthentication() {
+        const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+        const loginTime = sessionStorage.getItem('admin_login_time');
+        
+        if (!isAuthenticated || !loginTime) {
+            console.log('❌ Não autenticado, redirecionando...');
+            window.location.href = 'login.html';
+            return false;
+        }
+        
+        // Verificar se a sessão expirou (4 horas)
+        const loginDate = new Date(loginTime);
+        const now = new Date();
+        const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
+        
+        if (hoursDiff >= 4) {
+            console.log('⚠️ Sessão expirada');
+            sessionStorage.removeItem('admin_authenticated');
+            sessionStorage.removeItem('admin_username');
+            sessionStorage.removeItem('admin_login_time');
+            window.location.href = 'login.html';
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Verificar autenticação
+    if (!checkAdminAuthentication()) {
+        return;
+    }
+    
+    // Esconder overlay de autenticação
+    setTimeout(() => {
+        authOverlay.style.display = 'none';
+        
+        // Carregar dados do sistema
+        loadDashboard();
+        setupEventListeners();
+        
+        // Atualizar a cada 10 segundos
+        setInterval(loadDashboard, 10000);
+    }, 1000);
+    
+    // Carregar nome do admin
+    const adminUsername = sessionStorage.getItem('admin_username') || 'Administrador';
+    document.getElementById('adminUsername').textContent = adminUsername;
+});
         
         function loadDashboard() {
             try {
