@@ -369,15 +369,56 @@
     <script src="firebase-config.js"></script>
     <script src="firebase-app.js"></script>
     <script>
+       <script>
         // Verificar autenticação
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== ADMIN TOOLS INICIALIZANDO ===');
+            
             const authOverlay = document.getElementById('authOverlay');
             
-            // Verificar se está autenticado
-            if (sessionStorage.getItem('admin_authenticated') !== 'true') {
-                window.location.href = 'login.html';
+            // Função de verificação
+            function checkAuthForTools() {
+                const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
+                const loginTime = sessionStorage.getItem('admin_login_time');
+                
+                console.log('Verificando autenticação para tools:', {
+                    isAuthenticated: isAuthenticated,
+                    loginTime: loginTime
+                });
+                
+                if (!isAuthenticated || !loginTime) {
+                    console.log('❌ Não autenticado para tools, redirecionando...');
+                    window.location.href = 'login.html';
+                    return false;
+                }
+                
+                // Verificar expiração
+                try {
+                    const loginDate = new Date(loginTime);
+                    const now = new Date();
+                    const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
+                    
+                    if (hoursDiff >= 4) {
+                        console.log('⚠️ Sessão expirada para tools');
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('Erro ao verificar sessão:', error);
+                    window.location.href = 'login.html';
+                    return false;
+                }
+                
+                return true;
+            }
+            
+            // Verificar autenticação
+            if (!checkAuthForTools()) {
                 return;
             }
+            
+            console.log('✅ Tools autenticado, carregando...');
             
             // Carregar nome do admin
             const adminUsername = sessionStorage.getItem('admin_username') || 'Administrador';
@@ -389,7 +430,7 @@
                 loadSystemInfo();
                 updateLogDisplay();
                 addLog('Ferramentas administrativas carregadas', 'info');
-            }, 1000);
+            }, 500);
         });
         
         // Logs do sistema
