@@ -40,7 +40,7 @@ function logInitialization(env) {
   }
 }
 
-// Inicializar Firebase
+// Modificar a função initializeFirebaseApp:
 function initializeFirebaseApp() {
   // Verificar se Firebase SDK foi carregado
   if (typeof firebase === 'undefined') {
@@ -60,8 +60,21 @@ function initializeFirebaseApp() {
       console.log('✅ Firebase inicializado com sucesso');
     }
     
-    // Configurar Firestore
+    // Configurar Firestore COM PERSISTÊNCIA PRIMEIRO
     const db = firebase.firestore(app);
+    
+    // HABILITAR PERSISTÊNCIA ANTES DE QUALQUER OUTRA OPERAÇÃO
+    db.enablePersistence()
+      .then(() => {
+        console.log('✅ Persistência offline ativada');
+      })
+      .catch((err) => {
+        if (err.code === 'failed-precondition') {
+          console.warn('⚠️ Múltiplas abas abertas - Persistência limitada');
+        } else if (err.code === 'unimplemented') {
+          console.warn('⚠️ Persistência não suportada pelo navegador');
+        }
+      });
     
     // Configurações para desenvolvimento
     if (APP_ENV === 'development') {
@@ -95,7 +108,6 @@ function initializeFirebaseApp() {
     return null;
   }
 }
-
 // Mock para desenvolvimento offline
 function createFirebaseMock() {
   console.warn('⚠️ Usando MOCK do Firebase - Dados apenas locais');
