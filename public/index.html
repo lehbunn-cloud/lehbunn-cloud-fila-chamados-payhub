@@ -217,7 +217,7 @@
         </div>
     </div>
     
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK (mantido apenas aqui) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -226,7 +226,7 @@
     <script src="firebase-config.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Verificar status do Firebase
+            // Inicializar Firebase apenas uma vez
             setTimeout(() => {
                 const firebaseApp = window.firebaseApp;
                 const statusElement = document.getElementById('firebaseStatus');
@@ -241,7 +241,7 @@
                     statusElement.textContent = '❌ Não conectado';
                     statusElement.style.color = '#f44336';
                 }
-            }, 1000);
+            }, 1500);
         });
     </script>
 </body>
