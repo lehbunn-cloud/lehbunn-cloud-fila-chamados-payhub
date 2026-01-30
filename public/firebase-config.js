@@ -142,14 +142,26 @@ function setupConnectionMonitoring(firebaseApp) {
   if (!firebaseApp || firebaseApp.isMock) return;
   
   try {
-    const connectionRef = firebaseApp.db.collection('.info/connected');
+    // Monitorar conexão de forma correta
+    firebaseApp.db.enableNetwork()
+      .then(() => {
+        console.log('✅ Rede habilitada');
+        updateConnectionStatus(true);
+      })
+      .catch((error) => {
+        console.error('❌ Erro ao habilitar rede:', error);
+        updateConnectionStatus(false);
+      });
     
-    connectionRef.onSnapshot((snapshot) => {
-      const isConnected = snapshot.data()?.connected || false;
-      updateConnectionStatus(isConnected);
-    });
+    // Verificar conexão periodicamente
+    setInterval(() => {
+      firebaseApp.db.getCollections()
+        .then(() => updateConnectionStatus(true))
+        .catch(() => updateConnectionStatus(false));
+    }, 30000);
+    
   } catch (error) {
-    console.error('❌ Erro ao monitorar conexão:', error);
+    console.error('❌ Erro ao configurar monitoramento:', error);
   }
 }
 
