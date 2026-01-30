@@ -524,60 +524,74 @@
             
             // Função de verificação robusta
             function checkAdminAuth() {
-                console.log('🔍 Verificando autenticação...');
-                
-                // Verificar se há sessão válida
-                const isAuthenticated = sessionStorage.getItem('admin_authenticated') === 'true';
-                const loginTime = sessionStorage.getItem('admin_login_time');
-                const username = sessionStorage.getItem('admin_username');
-                
-                console.log('Dados da sessão:', {
-                    isAuthenticated: isAuthenticated,
-                    username: username,
-                    loginTime: loginTime
-                });
-                
-                // Se não autenticado, redirecionar imediatamente
-                if (!isAuthenticated) {
-                    console.log('❌ NÃO AUTENTICADO - Redirecionando para login');
-                    // Forçar limpeza
-                    sessionStorage.clear();
-                    window.location.href = 'login.html';
-                    return false;
-                }
-                
-                // Se não tem tempo de login
-                if (!loginTime) {
-                    console.log('❌ SEM TEMPO DE LOGIN - Redirecionando');
-                    sessionStorage.clear();
-                    window.location.href = 'login.html';
-                    return false;
-                }
-                
-                // Verificar se a sessão expirou (4 horas)
-                try {
-                    const loginDate = new Date(loginTime);
-                    const now = new Date();
-                    const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
-                    
-                    console.log(`Tempo desde login: ${hoursDiff.toFixed(2)} horas`);
-                    
-                    if (hoursDiff >= 4) {
-                        console.log('⚠️ SESSÃO EXPIRADA - Redirecionando');
-                        sessionStorage.clear();
-                        window.location.href = 'login.html';
-                        return false;
-                    }
-                } catch (error) {
-                    console.error('Erro ao verificar tempo de login:', error);
-                    sessionStorage.clear();
-                    window.location.href = 'login.html';
-                    return false;
-                }
-                
-                console.log('✅ SESSÃO VÁLIDA - Carregando dashboard');
-                return true;
+    console.log('🔍 Verificando autenticação...');
+    
+    // Verificar em sessionStorage E localStorage
+    const isAuthenticatedSession = sessionStorage.getItem('admin_authenticated') === 'true';
+    const isAuthenticatedLocal = localStorage.getItem('admin_authenticated') === 'true';
+    
+    const loginTimeSession = sessionStorage.getItem('admin_login_time');
+    const loginTimeLocal = localStorage.getItem('admin_login_time');
+    
+    const usernameSession = sessionStorage.getItem('admin_username');
+    const usernameLocal = localStorage.getItem('admin_username');
+    
+    console.log('Dados da sessão:', {
+        session: {
+            auth: isAuthenticatedSession,
+            user: usernameSession,
+            time: loginTimeSession
+        },
+        local: {
+            auth: isAuthenticatedLocal,
+            user: usernameLocal,
+            time: loginTimeLocal
+        }
+    });
+    
+    // Se não autenticado em nenhum, redirecionar
+    if (!isAuthenticatedSession && !isAuthenticatedLocal) {
+        console.log('❌ NÃO AUTENTICADO - Redirecionando para login');
+        // Limpar tudo
+        sessionStorage.clear();
+        localStorage.removeItem('admin_authenticated');
+        localStorage.removeItem('admin_username');
+        localStorage.removeItem('admin_login_time');
+        window.location.href = 'login.html';
+        return false;
+    }
+    
+    // Usar dados de sessionStorage primeiro, fallback para localStorage
+    const isAuthenticated = isAuthenticatedSession || isAuthenticatedLocal;
+    const loginTime = loginTimeSession || loginTimeLocal;
+    const username = usernameSession || usernameLocal;
+    
+    // Verificar se a sessão expirou (4 horas)
+    if (loginTime) {
+        try {
+            const loginDate = new Date(loginTime);
+            const now = new Date();
+            const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
+            
+            console.log(`Tempo desde login: ${hoursDiff.toFixed(2)} horas`);
+            
+            if (hoursDiff >= 4) {
+                console.log('⚠️ SESSÃO EXPIRADA - Redirecionando');
+                sessionStorage.clear();
+                localStorage.removeItem('admin_authenticated');
+                localStorage.removeItem('admin_username');
+                localStorage.removeItem('admin_login_time');
+                window.location.href = 'login.html';
+                return false;
             }
+        } catch (error) {
+            console.error('Erro ao verificar tempo de login:', error);
+        }
+    }
+    
+    console.log('✅ SESSÃO VÁLIDA - Usuário:', username);
+    return true;
+}
             
             // EXECUTAR VERIFICAÇÃO IMEDIATAMENTE
             const isAuthenticated = checkAdminAuth();
