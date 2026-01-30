@@ -343,13 +343,25 @@
     <script src="app.js"></script>
     
     <script>
-        // Esconder overlay quando tudo estiver carregado
-        window.addEventListener('load', function() {
-            setTimeout(() => {
-                document.getElementById('loadingOverlay').style.display = 'none';
-            }, 1500);
-        });
-    </script>
+    // Esconder overlay quando tudo estiver carregado
+    document.addEventListener('DOMContentLoaded', function() {
+        // Verificar se o app.js foi carregado corretamente
+        const checkAppLoaded = setInterval(() => {
+            if (typeof window.appController !== 'undefined') {
+                clearInterval(checkAppLoaded);
+                // Dar tempo extra para a interface carregar
+                setTimeout(() => {
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                }, 1000);
+            }
+        }, 500);
+        
+        // Timeout de segurança
+        setTimeout(() => {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }, 10000);
+    });
+</script>
 	<script>
     // Atualizar status do loading
     function updateLoadingStatus(message) {
