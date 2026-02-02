@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Fila PayHub</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-users"></i> Portal de Fila - PayHub</h1>
+            <div class="current-time" id="currentTime"></div>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <h3><i class="fas fa-user-plus"></i> Novo Chamado</h3>
+                <input type="text" id="clienteInput" placeholder="Nome do Cliente" list="clientesList">
+                <datalist id="clientesList">
+                    <option value="Cliente Comum">
+                    <option value="Benoit">
+                    <option value="TIM">
+                    <option value="DPSP">
+                </datalist>
+                <button onclick="adicionarChamado()" class="btn-add">
+                    <i class="fas fa-plus"></i> Adicionar à Fila
+                </button>
+            </div>
+
+            <div class="control-group">
+                <h3><i class="fas fa-cog"></i> Configurações</h3>
+                <button onclick="reiniciarFila()" class="btn-reset">
+                    <i class="fas fa-redo"></i> Reiniciar Fila Hoje
+                </button>
+                <div class="status-indicator">
+                    <span class="status-dot active"></span>
+                    <span id="statusText">Conectado</span>
+                </div>
+            </div>
+        </div>
+
+        <main>
+            <div class="queue-section">
+                <h2><i class="fas fa-clock"></i> Próximos da Fila</h2>
+                <div class="queue-list" id="filaList">
+                    <!-- Lista de chamados em fila será carregada aqui -->
+                </div>
+            </div>
+
+            <div class="analysts-section">
+                <h2><i class="fas fa-user-tie"></i> Analistas em Atendimento</h2>
+                <div class="analysts-grid" id="analistasAtendimento">
+                    <!-- Analistas em atendimento serão carregados aqui -->
+                </div>
+
+                <h2><i class="fas fa-user-check"></i> Analistas Disponíveis</h2>
+                <div class="analysts-grid" id="analistasDisponiveis">
+                    <!-- Analistas disponíveis serão carregados aqui -->
+                </div>
+            </div>
+        </main>
+
+        <div class="rules-info">
+            <h3><i class="fas fa-info-circle"></i> Regras do Sistema</h3>
+            <ul>
+                <li><strong>Horários:</strong> Eric (8h-17h), Carolina/Cristiane/Tamiris/André/Felipe (9h-18h), Sander/Yan (14h-23h)</li>
+                <li><strong>Clientes Especiais:</strong> Benoit → André, TIM → Eric, DPSP → Felipe</li>
+                <li><strong>Rodízio:</strong> Ordem dos 8 analistas, continua no dia seguinte</li>
+                <li><strong>Aguardando Retorno:</strong> Analista volta para o final da fila</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
