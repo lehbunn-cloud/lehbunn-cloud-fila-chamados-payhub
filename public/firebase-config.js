@@ -105,4 +105,10 @@ window.firebaseConfig = {
     }
 };
 
+// Teste automático após carregar
+setTimeout(async () => {
+    const status = await window.firebaseConfig.testConnection();
+    console.log(`📡 Status Firebase: ${status.connected ? '✅ Conectado' : '❌ Offline'}`);
+}, 1000);
+
 console.log('✅ Configuração Firebase carregada');
