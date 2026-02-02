@@ -194,7 +194,7 @@
             </div>
             <div class="modal-body" style="text-align: center; padding: 40px 20px;">
                 <div class="loading-spinner-large" style="margin-bottom: 20px;"></div>
-                <h3 style="margin-bottom: 10px;">Verificando autenticação...</h3>
+                <h3 style="margin-bottom: 10px;">Verificando autenticação...</</h3>
                 <p style="color: #6c757d;">Aguarde enquanto verificamos suas credenciais.</p>
             </div>
         </div>
@@ -206,7 +206,7 @@
                 <h1>
                     <i class="fas fa-tools"></i>
                     Ferramentas Administrativas
-                    <span class="version-badge">v3.5.0</span>
+                    <span class="version-badge">v4.0.0</span>
                 </h1>
                 <p>Configurações avançadas e manutenção do sistema</p>
             </div>
@@ -250,7 +250,7 @@
                 <div class="system-info">
                     <div class="info-item-admin">
                         <div class="info-label-admin">Versão do Sistema</div>
-                        <div class="info-value-admin" id="systemVersion">v3.5.0</div>
+                        <div class="info-value-admin" id="systemVersion">v4.0.0</div>
                     </div>
                     <div class="info-item-admin">
                         <div class="info-label-admin">Status Firebase</div>
@@ -261,8 +261,38 @@
                         <div class="info-value-admin" id="lastBackupTime">Nunca</div>
                     </div>
                     <div class="info-item-admin">
-                        <div class="info-label-admin">Sessão Atual</div>
-                        <div class="info-value-admin" id="currentSession">---</div>
+                        <div class="info-label-admin">Analistas Cadastrados</div>
+                        <div class="info-value-admin" id="totalAnalystsCount">0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Seção: Gerenciar Analistas -->
+            <div class="admin-section">
+                <h2><i class="fas fa-users-cog"></i> Gerenciar Analistas</h2>
+                <div class="admin-grid">
+                    <div class="admin-card">
+                        <h3><i class="fas fa-user-plus"></i> Cadastrar Analistas</h3>
+                        <p>Cadastrar todos os analistas no Firebase com horários e clientes especiais</p>
+                        <button class="btn btn-success" onclick="setupAnalystsInFirebase()">
+                            <i class="fas fa-save"></i> Cadastrar no Firebase
+                        </button>
+                    </div>
+                    
+                    <div class="admin-card">
+                        <h3><i class="fas fa-sync-alt"></i> Sincronizar Dados</h3>
+                        <p>Sincronizar dados locais com o Firebase</p>
+                        <button class="btn" onclick="syncWithFirebase()">
+                            <i class="fas fa-sync"></i> Sincronizar Agora
+                        </button>
+                    </div>
+                    
+                    <div class="admin-card">
+                        <h3><i class="fas fa-list"></i> Listar Analistas</h3>
+                        <p>Visualizar todos os analistas cadastrados</p>
+                        <button class="btn" onclick="listAnalysts()">
+                            <i class="fas fa-list"></i> Ver Lista
+                        </button>
                     </div>
                 </div>
             </div>
@@ -308,8 +338,8 @@
                     <button class="btn" onclick="reloadFirebase()">
                         <i class="fas fa-sync"></i> Recarregar Firebase
                     </button>
-                    <button class="btn btn-warning" onclick="forceResetQueue()">
-                        <i class="fas fa-redo"></i> Forçar Reset da Fila
+                    <button class="btn btn-warning" onclick="resetQueueOrder()">
+                        <i class="fas fa-redo"></i> Resetar Ordem da Fila
                     </button>
                     <button class="btn" onclick="generateReport()">
                         <i class="fas fa-file-csv"></i> Gerar Relatório CSV
@@ -347,15 +377,15 @@
                     <button class="btn btn-danger" onclick="resetEverything()">
                         <i class="fas fa-bomb"></i> Resetar Tudo
                     </button>
-                    <button class="btn btn-danger" onclick="deleteFirebaseData()">
-                        <i class="fas fa-fire"></i> Limpar Firebase
+                    <button class="btn btn-danger" onclick="deleteAllData()">
+                        <i class="fas fa-fire"></i> Limpar Todos os Dados
                     </button>
                 </div>
             </div>
         </div>
         
         <div class="footer">
-            <p><strong>Portal Payhub - Ferramentas Administrativas</strong> | v3.5.0</p>
+            <p><strong>Portal Payhub - Ferramentas Administrativas</strong> | v4.0.0</p>
             <p>Use com cautela. Ações administrativas são registradas.</p>
         </div>
     </div>
@@ -368,62 +398,302 @@
     <!-- Scripts -->
     <script src="firebase-config.js"></script>
     <script src="firebase-app.js"></script>
+    <script src="app.js"></script>
+    
     <script>
-       <script>
-        // Verificar autenticação - VERSÃO SIMPLIFICADA
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== ADMIN TOOLS INICIALIZANDO ===');
-    
-    const authOverlay = document.getElementById('authOverlay');
-    
-    // Verificação SIMPLES
-    function checkAuth() {
-        console.log('🔍 Verificando autenticação para tools...');
+        // VERIFICAÇÃO DE AUTENTICAÇÃO
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== ADMIN TOOLS INICIALIZANDO ===');
+            
+            const authOverlay = document.getElementById('authOverlay');
+            
+            function checkAuth() {
+                console.log('🔍 Verificando autenticação para tools...');
+                
+                const localAuth = localStorage.getItem('admin_auth') === 'true';
+                const sessionAuth = sessionStorage.getItem('admin_auth') === 'true';
+                
+                if (!localAuth && !sessionAuth) {
+                    console.log('❌ Não autenticado, redirecionando...');
+                    window.location.href = 'login.html';
+                    return false;
+                }
+                
+                console.log('✅ Autenticado para tools');
+                return true;
+            }
+            
+            if (!checkAuth()) {
+                return;
+            }
+            
+            console.log('✅ Tools autenticado, carregando...');
+            
+            // Carregar nome do admin
+            const adminUsername = localStorage.getItem('admin_user') || 'Administrador';
+            document.getElementById('currentAdminUser').textContent = adminUsername;
+            
+            // Esconder overlay e continuar
+            setTimeout(() => {
+                authOverlay.style.display = 'none';
+                loadSystemInfo();
+                updateLogDisplay();
+                addLog('Ferramentas administrativas carregadas', 'info');
+            }, 300);
+        });
         
-        const localAuth = localStorage.getItem('admin_auth') === 'true';
-        const sessionAuth = sessionStorage.getItem('admin_auth') === 'true';
+        // ============================================
+        // FUNÇÕES DE GESTÃO DE ANALISTAS
+        // ============================================
         
-        if (!localAuth && !sessionAuth) {
-            console.log('❌ Não autenticado, redirecionando...');
-            window.location.href = 'login.html';
-            return false;
+        async function setupAnalystsInFirebase() {
+            if (!window.firebaseAppIntegration || !window.firebaseAppIntegration.initialized) {
+                alert('Firebase não está disponível');
+                return;
+            }
+            
+            const analysts = [
+                {
+                    id: 1,
+                    name: "Eric",
+                    level: "N1",
+                    startTime: 8,
+                    endTime: 17,
+                    specialClient: "TIM",
+                    isActive: true,
+                    shift: "manhã",
+                    isAvailable: false,
+                    isBusy: false,
+                    currentTicket: null,
+                    ticketsHandled: 0,
+                    inQueue: true,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 2,
+                    name: "Carolina",
+                    level: "N1",
+                    startTime: 9,
+                    endTime: 18,
+                    specialClient: null,
+                    isActive: true,
+                    shift: "manhã",
+                    isAvailable: false,
+                    isBusy: false,
+                    currentTicket: null,
+                    ticketsHandled: 0,
+                    inQueue: true,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 3,
+                    name: "Tamiris",
+                    level: "N1",
+                    startTime: 9,
+                    endTime: 18,
+                    specialClient: null,
+                    isActive: true,
+                    shift: "manhã",
+                    isAvailable: false,
+                    isBusy: false,
+                    currentTicket: null,
+                    ticketsHandled: 0,
+                    inQueue: true,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 4,
+                    name: "Cristiane",
+                    level: "N1",
+                    startTime: 9,
+                    endTime: 18,
+                    specialClient: null,
+                    isActive: true,
+                    shift: "manhã",
+                    isAvailable: false,
+                    isBusy: false,
+                    currentTicket: null,
+                    ticketsHandled: 0,
+                    inQueue: true,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 5,
+                    name: "Jonathan",
+                    level: "N1",
+                    startTime: 8,
+                    endTime: 17,
+                    specialClient: null,
+                    isActive: true,
+                    shift: "manhã",
+                    isAvailable: false,
+                    isBusy: false,
+                    currentTicket: null,
+                    ticketsHandled: 0,
+                    inQueue: true,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 6,
+                    name: "Sander",
+                    level: "N1",
+                    startTime: 14,
+                    endTime: 23,
+                    specialClient: null,
+                    isActive: true,
+                    shift: "tarde",
+                    isAvailable: false,
+                    isBusy: false,
+                    currentTicket: null,
+                    ticketsHandled: 0,
+                    inQueue: true,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 7,
+                    name: "Yan",
+                    level: "N1",
+                    startTime: 14,
+                    endTime: 23,
+                    specialClient: null,
+                    isActive: true,
+                    shift: "tarde",
+                    isAvailable: false,
+                    isBusy: false,
+                    currentTicket: null,
+                    ticketsHandled: 0,
+                    inQueue: true,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 8,
+                    name: "André",
+                    level: "N1",
+                    startTime: 8,
+                    endTime: 18,
+                    specialClient: "Benoit",
+                    isActive: true,
+                    shift: "integral",
+                    isAvailable: false,
+                    isBusy: false,
+                    currentTicket: null,
+                    ticketsHandled: 0,
+                    inQueue: true,
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 9,
+                    name: "Felipe",
+                    level: "N1",
+                    startTime: 8,
+                    endTime: 18,
+                    specialClient: "DPSP",
+                    isActive: true,
+                    shift: "integral",
+                    isAvailable: false,
+                    isBusy: false,
+                    currentTicket: null,
+                    ticketsHandled: 0,
+                    inQueue: true,
+                    createdAt: new Date().toISOString()
+                }
+            ];
+            
+            try {
+                const db = window.firebaseAppIntegration.db;
+                
+                // Salvar cada analista
+                for (const analyst of analysts) {
+                    await db.collection('analysts').doc(`analyst_${analyst.id}`).set(analyst);
+                    console.log(`✅ Analista ${analyst.name} cadastrado`);
+                }
+                
+                addLog(`${analysts.length} analistas cadastrados no Firebase`, 'success');
+                alert(`✅ ${analysts.length} analistas cadastrados com sucesso no Firebase!`);
+                
+                // Atualizar contador
+                document.getElementById('totalAnalystsCount').textContent = analysts.length;
+                
+                // Recarregar sistema
+                if (window.portal) {
+                    window.location.reload();
+                }
+                
+            } catch (error) {
+                console.error('❌ Erro ao cadastrar analistas:', error);
+                addLog(`Erro ao cadastrar analistas: ${error.message}`, 'error');
+                alert('Erro ao cadastrar analistas');
+            }
         }
         
-        console.log('✅ Autenticado para tools');
-        return true;
-    }
-    
-    // Verificar autenticação
-    if (!checkAuth()) {
-        return;
-    }
-    
-    console.log('✅ Tools autenticado, carregando...');
-    
-    // Carregar nome do admin
-    const adminUsername = localStorage.getItem('admin_user') || 
-                         sessionStorage.getItem('admin_user') || 
-                         'Administrador';
-    document.getElementById('currentAdminUser').textContent = adminUsername;
-    
-    // Esconder overlay e continuar
-    setTimeout(() => {
-        authOverlay.style.display = 'none';
-        loadSystemInfo();
-        updateLogDisplay();
-        addLog('Ferramentas administrativas carregadas', 'info');
-    }, 300);
-});
-        // Logs do sistema
+        async function syncWithFirebase() {
+            if (!window.firebaseAppIntegration || !window.firebaseAppIntegration.initialized) {
+                alert('Firebase não está disponível');
+                return;
+            }
+            
+            try {
+                // Sincronizar analistas
+                await window.firebaseAppIntegration.saveAnalysts();
+                
+                // Sincronizar estado
+                if (window.portal) {
+                    window.portal.saveLocalState();
+                }
+                
+                addLog('Dados sincronizados com Firebase', 'success');
+                alert('✅ Dados sincronizados com sucesso!');
+                
+            } catch (error) {
+                console.error('❌ Erro na sincronização:', error);
+                addLog(`Erro na sincronização: ${error.message}`, 'error');
+                alert('Erro na sincronização');
+            }
+        }
+        
+        function listAnalysts() {
+            if (!window.portal || !window.portal.analysts) {
+                alert('Sistema não carregado');
+                return;
+            }
+            
+            const analysts = window.portal.analysts;
+            let message = `Total de analistas: ${analysts.length}\n\n`;
+            
+            analysts.forEach(analyst => {
+                message += `${analyst.name} (${analyst.level})\n`;
+                message += `  Horário: ${analyst.startTime}h-${analyst.endTime}h\n`;
+                message += `  Status: ${analyst.isAvailable ? 'Disponível' : 'Indisponível'}\n`;
+                message += `  Cliente Especial: ${analyst.specialClient || 'Nenhum'}\n`;
+                message += `  Tickets hoje: ${analyst.ticketsHandled}\n`;
+                message += `  Em atendimento: ${analyst.isBusy ? 'Sim' : 'Não'}\n`;
+                if (analyst.currentTicket) {
+                    message += `  Ticket atual: ${analyst.currentTicket}\n`;
+                }
+                message += '\n';
+            });
+            
+            alert(message);
+        }
+        
+        function resetQueueOrder() {
+            if (confirm('Resetar ordem da fila?\n\nIsso resetará o índice de rotação da fila.')) {
+                localStorage.removeItem('queue_index');
+                localStorage.removeItem('last_queue_index');
+                addLog('Ordem da fila resetada', 'info');
+                alert('✅ Ordem da fila resetada!');
+            }
+        }
+        
+        // ============================================
+        // SISTEMA DE LOGS
+        // ============================================
+        
         const systemLogs = [];
         
         function loadSystemInfo() {
             // Versão
-            document.getElementById('systemVersion').textContent = 'v3.5.0';
-            
-            // Sessão
-            const sessionId = sessionStorage.getItem('queue_session_id') || 'Não definida';
-            document.getElementById('currentSession').textContent = sessionId.substring(0, 12) + '...';
+            document.getElementById('systemVersion').textContent = 'v4.0.0';
             
             // Status Firebase
             const firebaseStatus = window.firebaseAppIntegration ? 
@@ -434,6 +704,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Último backup
             const lastBackup = localStorage.getItem('last_backup_time');
             document.getElementById('lastBackupTime').textContent = lastBackup || 'Nunca';
+            
+            // Contador de analistas
+            if (window.portal && window.portal.analysts) {
+                document.getElementById('totalAnalystsCount').textContent = window.portal.analysts.length;
+            }
         }
         
         function addLog(message, type = 'info') {
@@ -460,14 +735,23 @@ document.addEventListener('DOMContentLoaded', function() {
             container.scrollTop = container.scrollHeight;
         }
         
-        // Funções de backup
+        // ============================================
+        // FUNÇÕES DE BACKUP
+        // ============================================
+        
         function createBackup() {
             try {
-                const state = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                // Coletar todos os dados
                 const backupData = {
-                    ...state,
+                    portalState: localStorage.getItem('portal_payhub_state'),
+                    adminAuth: localStorage.getItem('admin_auth'),
+                    adminUser: localStorage.getItem('admin_user'),
+                    adminTime: localStorage.getItem('admin_time'),
+                    queueIndex: localStorage.getItem('queue_index'),
+                    lastQueueIndex: localStorage.getItem('last_queue_index'),
+                    offlineTickets: localStorage.getItem('offline_tickets'),
                     backupTime: new Date().toISOString(),
-                    backupType: 'manual'
+                    version: '4.0.0'
                 };
                 
                 const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -517,7 +801,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // Restaurar dados
-                    localStorage.setItem('queue_state', JSON.stringify(backupData));
+                    if (backupData.portalState) {
+                        localStorage.setItem('portal_payhub_state', backupData.portalState);
+                    }
+                    if (backupData.adminAuth) {
+                        localStorage.setItem('admin_auth', backupData.adminAuth);
+                    }
+                    if (backupData.adminUser) {
+                        localStorage.setItem('admin_user', backupData.adminUser);
+                    }
+                    if (backupData.adminTime) {
+                        localStorage.setItem('admin_time', backupData.adminTime);
+                    }
+                    if (backupData.queueIndex) {
+                        localStorage.setItem('queue_index', backupData.queueIndex);
+                    }
+                    if (backupData.lastQueueIndex) {
+                        localStorage.setItem('last_queue_index', backupData.lastQueueIndex);
+                    }
+                    if (backupData.offlineTickets) {
+                        localStorage.setItem('offline_tickets', backupData.offlineTickets);
+                    }
                     
                     addLog(`Backup restaurado: ${backupData.backupTime}`, 'success');
                     alert('✅ Backup restaurado com sucesso! Recarregue a página.');
@@ -533,11 +837,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         function exportData() {
             try {
-                const state = JSON.parse(localStorage.getItem('queue_state') || '{}');
+                const portalState = localStorage.getItem('portal_payhub_state');
                 const exportData = {
-                    ...state,
+                    portalState: portalState ? JSON.parse(portalState) : null,
                     exportTime: new Date().toISOString(),
-                    exportType: 'full_export'
+                    exportType: 'full_export',
+                    version: '4.0.0'
                 };
                 
                 const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -557,91 +862,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        function generateReport() {
-            if (!window.firebaseAppIntegration || !window.firebaseAppIntegration.initialized) {
-                alert('Firebase não está disponível para gerar relatórios');
-                return;
-            }
-            
-            const today = new Date().toISOString().split('T')[0];
-            const startDate = prompt('Data inicial (YYYY-MM-DD):', today);
-            const endDate = prompt('Data final (YYYY-MM-DD):', today);
-            
-            if (!startDate || !endDate) return;
-            
-            const includeAll = confirm('Incluir todos os tickets (não apenas especiais)?');
-            
-            addLog(`Gerando relatório de ${startDate} até ${endDate}`, 'info');
-            
-            window.firebaseAppIntegration.getTicketsByDateRange(startDate, endDate, includeAll)
-                .then(tickets => {
-                    if (tickets.length === 0) {
-                        alert('Nenhum ticket encontrado no período selecionado');
-                        return;
-                    }
-                    
-                    const headers = [
-                        'Número do Ticket',
-                        'Analista',
-                        'Status',
-                        'Tipo de Cliente',
-                        'Horário Início',
-                        'Horário Fim',
-                        'Duração (segundos)',
-                        'Data Criação'
-                    ];
-                    
-                    const csvRows = [headers.join(';')];
-                    
-                    tickets.forEach(ticket => {
-                        const row = [
-                            ticket.ticketNumber,
-                            ticket.analystName,
-                            ticket.status,
-                            ticket.clientType,
-                            window.firebaseAppIntegration.formatDate(ticket.startTime),
-                            window.firebaseAppIntegration.formatDate(ticket.endTime),
-                            ticket.duration || '',
-                            window.firebaseAppIntegration.formatDate(ticket.createdAt)
-                        ];
-                        csvRows.push(row.join(';'));
-                    });
-                    
-                    const csvString = csvRows.join('\n');
-                    const BOM = '\uFEFF';
-                    const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8;' });
-                    const link = document.createElement('a');
-                    
-                    link.href = URL.createObjectURL(blob);
-                    link.download = `relatorio_payhub_${startDate}_${endDate}.csv`;
-                    link.style.display = 'none';
-                    
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    setTimeout(() => URL.revokeObjectURL(link.href), 100);
-                    
-                    addLog(`Relatório gerado com ${tickets.length} tickets`, 'success');
-                    alert(`✅ Relatório gerado com ${tickets.length} tickets`);
-                    
-                })
-                .catch(error => {
-                    console.error('Erro ao gerar relatório:', error);
-                    addLog(`Erro ao gerar relatório: ${error.message}`, 'error');
-                    alert('❌ Erro ao gerar relatório');
-                });
-        }
+        // ============================================
+        // FUNÇÕES DE MANUTENÇÃO
+        // ============================================
         
-        // Funções de manutenção
         function clearLocalStorage() {
-            if (!confirm('Limpar todo o cache local?\nIsso removerá dados não sincronizados.')) {
+            if (!confirm('Limpar todo o cache local?\n\nIsso removerá dados não sincronizados.')) {
                 return;
             }
             
             try {
+                // Manter apenas autenticação
+                const adminAuth = localStorage.getItem('admin_auth');
+                const adminUser = localStorage.getItem('admin_user');
+                const adminTime = localStorage.getItem('admin_time');
+                
                 localStorage.clear();
-                sessionStorage.clear();
+                
+                // Restaurar autenticação
+                if (adminAuth) localStorage.setItem('admin_auth', adminAuth);
+                if (adminUser) localStorage.setItem('admin_user', adminUser);
+                if (adminTime) localStorage.setItem('admin_time', adminTime);
                 
                 addLog('Cache local limpo', 'warning');
                 alert('✅ Cache limpo com sucesso!');
@@ -663,53 +904,53 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        function forceResetQueue() {
-            if (!confirm('Forçar reset da fila?\nTodos os dados atuais serão perdidos.')) {
+        async function generateReport() {
+            if (!window.firebaseAppIntegration || !window.firebaseAppIntegration.initialized) {
+                alert('Firebase não está disponível para gerar relatórios');
                 return;
             }
             
-            const resetState = {
-                appState: {
-                    ticketsToday: 0,
-                    specialTicketsToday: 0,
-                    waitingTicketsToday: 0,
-                    lastReset: new Date().toLocaleDateString('pt-BR'),
-                    nextTicketNumber: 1000
-                },
-                analysts: [
-                    { id: 1, name: "Analista 01", level: "N1", startTime: 8, endTime: 17 },
-                    { id: 2, name: "Analista 02", level: "N1", startTime: 8, endTime: 17 },
-                    { id: 3, name: "Analista 03", level: "N1", startTime: 8, endTime: 17 },
-                    { id: 4, name: "Analista 04", level: "N2", startTime: 9, endTime: 18 },
-                    { id: 5, name: "Analista 05", level: "N2", startTime: 9, endTime: 18 },
-                    { id: 6, name: "Analista 06", level: "N2", startTime: 9, endTime: 18 },
-                    { id: 7, name: "Analista 07", level: "N3", startTime: 10, endTime: 19 },
-                    { id: 8, name: "Analista 08", level: "N3", startTime: 10, endTime: 19 },
-                    { id: 9, name: "Analista 09", level: "N3", startTime: 10, endTime: 19 }
-                ].map(a => ({
-                    id: a.id,
-                    isAvailable: false,
-                    isBusy: false,
-                    currentTicket: null,
-                    ticketStatus: null,
-                    ticketSpecialType: null,
-                    ticketsHandled: 0,
-                    isWaitingForClient: false,
-                    inQueue: a.level === "N1",
-                    lastActivity: null
-                })),
-                queueOrder: [],
-                version: '3.5.0',
-                resetTime: new Date().toISOString()
-            };
+            const today = new Date().toISOString().split('T')[0];
+            const startDate = prompt('Data inicial (YYYY-MM-DD):', today);
+            const endDate = prompt('Data final (YYYY-MM-DD):', today);
             
-            localStorage.setItem('queue_state', JSON.stringify(resetState));
+            if (!startDate || !endDate) return;
             
-            addLog('Fila resetada forçadamente', 'warning');
-            alert('✅ Fila resetada! Recarregue a página.');
+            const includeAll = confirm('Incluir todos os tickets (não apenas especiais)?');
+            
+            addLog(`Gerando relatório de ${startDate} até ${endDate}`, 'info');
+            
+            try {
+                const csvContent = await window.firebaseAppIntegration.generateReport(
+                    startDate,
+                    endDate,
+                    includeAll
+                );
+                
+                if (!csvContent) {
+                    alert('Nenhum ticket encontrado no período selecionado');
+                    return;
+                }
+                
+                const filename = `relatorio_${startDate.replace(/-/g, '')}_${endDate.replace(/-/g, '')}.csv`;
+                const success = window.firebaseAppIntegration.downloadCSV(csvContent, filename);
+                
+                if (success) {
+                    addLog(`Relatório gerado com sucesso: ${filename}`, 'success');
+                    alert(`✅ Relatório gerado: ${filename}`);
+                }
+                
+            } catch (error) {
+                console.error('Erro ao gerar relatório:', error);
+                addLog(`Erro ao gerar relatório: ${error.message}`, 'error');
+                alert('❌ Erro ao gerar relatório');
+            }
         }
         
-        // Funções de logs
+        // ============================================
+        // FUNÇÕES DE LOGS
+        // ============================================
+        
         function clearLogs() {
             systemLogs.length = 0;
             updateLogDisplay();
@@ -734,7 +975,10 @@ document.addEventListener('DOMContentLoaded', function() {
             addLog('Logs exportados', 'info');
         }
         
-        // Funções perigosas
+        // ============================================
+        // FUNÇÕES PERIGOSAS
+        // ============================================
+        
         function resetEverything() {
             if (!confirm('🚨 RESETAR TUDO?\n\nEsta ação é IRREVERSÍVEL e irá:\n• Apagar todos os dados locais\n• Limpar todo o histórico\n• Resetar o sistema para o estado inicial\n\nDigite "RESETAR" para confirmar:')) {
                 return;
@@ -758,18 +1002,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 2000);
         }
         
-        function deleteFirebaseData() {
-            if (!confirm('🚨 LIMPAR DADOS DO FIREBASE?\n\nEsta ação tentará apagar todos os dados no Firebase.\nIsso pode não ser reversível.\n\nDigite "APAGAR" para confirmar:')) {
+        function deleteAllData() {
+            if (!confirm('🚨 LIMPAR TODOS OS DADOS?\n\nEsta ação tentará apagar todos os dados no Firebase.\nIsso pode não ser reversível.\n\nDigite "APAGAR" para confirmar:')) {
                 return;
             }
             
             const confirmation = prompt('Digite "APAGAR" para confirmar:');
             if (confirmation !== 'APAGAR') {
-                addLog('Exclusão Firebase cancelada', 'warning');
+                addLog('Exclusão cancelada', 'warning');
                 return;
             }
             
-            addLog('Tentando limpar dados Firebase...', 'warning');
+            addLog('Tentando limpar todos os dados...', 'warning');
             alert('⚠️ Esta funcionalidade requer implementação específica no servidor.');
         }
     </script>
