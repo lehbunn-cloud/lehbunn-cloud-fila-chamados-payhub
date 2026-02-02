@@ -11,11 +11,6 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    
     <!-- Estilos -->
     <link rel="stylesheet" href="style.css">
     
@@ -139,83 +134,6 @@
             line-height: 1.5;
         }
         
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        
-        .modal-content {
-            background: white;
-            border-radius: 20px;
-            width: 100%;
-            max-width: 500px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        }
-        
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .modal-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #495057;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .close-modal {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: #6c757d;
-            cursor: pointer;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .close-modal:hover {
-            background: #f8f9fa;
-        }
-        
-        .modal-body {
-            padding: 20px;
-        }
-        
-        .modal-actions {
-            padding: 20px;
-            border-top: 1px solid #e9ecef;
-            display: flex;
-            justify-content: flex-end;
-            gap: 15px;
-        }
-        
         .quick-assign-section {
             margin-top: 30px;
         }
@@ -256,6 +174,16 @@
             font-size: 12px;
         }
         
+        .special-tag {
+            background: #FF9800;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+        
         @media (max-width: 768px) {
             .admin-header {
                 flex-direction: column;
@@ -264,10 +192,6 @@
             
             .admin-actions-grid {
                 grid-template-columns: 1fr;
-            }
-            
-            .modal-content {
-                margin: 10px;
             }
         }
     </style>
@@ -290,68 +214,6 @@
         </div>
     </div>
     
-    <!-- Modal para adicionar ticket -->
-    <div id="addTicketModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-plus-circle"></i>
-                    Adicionar Novo Ticket
-                </div>
-                <button class="close-modal" id="closeTicketModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="ticketNumber">
-                        <i class="fas fa-hashtag"></i>
-                        Número do Ticket
-                    </label>
-                    <input type="text" 
-                           id="ticketNumber" 
-                           class="input-field" 
-                           placeholder="Ex: 1234"
-                           autocomplete="off">
-                </div>
-                
-                <div class="form-group">
-                    <label for="ticketType">
-                        <i class="fas fa-star"></i>
-                        Tipo de Cliente
-                    </label>
-                    <select id="ticketType" class="input-field">
-                        <option value="normal">Cliente Normal</option>
-                        <option value="TIM">Cliente TIM (Eric)</option>
-                        <option value="DPSP">Cliente DPSP (Felipe)</option>
-                        <option value="Benoit">Cliente Benoit (André)</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="assignTo">
-                        <i class="fas fa-user"></i>
-                        Atribuir para
-                    </label>
-                    <select id="assignTo" class="input-field">
-                        <option value="queue">Adicionar à Fila de Espera</option>
-                        <!-- Opções serão preenchidas dinamicamente -->
-                    </select>
-                </div>
-                
-                <div id="analystStatusInfo" style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-top: 15px; display: none;">
-                    <div style="font-weight: 500; margin-bottom: 5px;">Status do Analista:</div>
-                    <div id="selectedAnalystStatus" style="font-size: 14px; color: #6c757d;"></div>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn" id="cancelAddTicket">Cancelar</button>
-                <button class="btn btn-success" id="confirmAddTicket">
-                    <i class="fas fa-plus"></i>
-                    Adicionar Ticket
-                </button>
-            </div>
-        </div>
-    </div>
-    
     <!-- Container principal -->
     <div class="container">
         <div class="header">
@@ -359,7 +221,7 @@
                 <h1>
                     <i class="fas fa-cogs"></i>
                     Painel Administrativo
-                    <span class="version-badge">v3.5.0</span>
+                    <span class="version-badge">v4.0.0</span>
                 </h1>
                 <p>Controle completo do sistema de fila de chamados</p>
             </div>
@@ -505,144 +367,110 @@
         </div>
         
         <div class="footer">
-            <p><strong>Portal Payhub - Painel Administrativo</strong> | v3.5.0</p>
+            <p><strong>Portal Payhub - Painel Administrativo</strong> | v4.0.0</p>
             <p>Última atualização: <span id="lastUpdate">--:--:--</span></p>
             <p class="last-reset">Acesso restrito a administradores autorizados</p>
         </div>
     </div>
     
-    <!-- Scripts -->
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
     <!-- Scripts -->
     <script src="firebase-config.js"></script>
     <script src="firebase-app.js"></script>
+    <script src="app.js"></script>
+    
     <script>
-  // VERIFICAÇÃO DE AUTENTICAÇÃO SIMPLES E EFETIVA
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== DASHBOARD INICIALIZANDO ===');
-    
-    const authOverlay = document.getElementById('authOverlay');
-    
-    // Verificação SIMPLES
-    function checkAuth() {
-        console.log('🔍 Verificando autenticação...');
-        
-        // Verificar em localStorage (principal) e sessionStorage (backup)
-        const localAuth = localStorage.getItem('admin_auth') === 'true';
-        const sessionAuth = sessionStorage.getItem('admin_auth') === 'true';
-        
-        const authTime = parseInt(localStorage.getItem('admin_time') || sessionStorage.getItem('admin_time') || '0');
-        const currentTime = Date.now();
-        const hoursDiff = (currentTime - authTime) / (1000 * 60 * 60);
-        
-        console.log('Status auth:', {
-            local: localAuth,
-            session: sessionAuth,
-            hoursDiff: hoursDiff.toFixed(2),
-            authTime: new Date(authTime).toLocaleString()
+        // VERIFICAÇÃO DE AUTENTICAÇÃO
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== DASHBOARD ADMIN INICIALIZANDO ===');
+            
+            const authOverlay = document.getElementById('authOverlay');
+            
+            // Verificar autenticação
+            function checkAuth() {
+                console.log('🔍 Verificando autenticação...');
+                
+                const localAuth = localStorage.getItem('admin_auth') === 'true';
+                const sessionAuth = sessionStorage.getItem('admin_auth') === 'true';
+                
+                const authTime = parseInt(localStorage.getItem('admin_time') || sessionStorage.getItem('admin_time') || '0');
+                const currentTime = Date.now();
+                const hoursDiff = (currentTime - authTime) / (1000 * 60 * 60);
+                
+                console.log('Status auth:', {
+                    local: localAuth,
+                    session: sessionAuth,
+                    hoursDiff: hoursDiff.toFixed(2)
+                });
+                
+                // Se não autenticado ou sessão expirou (> 8 horas)
+                if ((!localAuth && !sessionAuth) || hoursDiff > 8) {
+                    console.log('❌ Não autenticado ou sessão expirada');
+                    
+                    // Limpar tudo
+                    localStorage.removeItem('admin_auth');
+                    localStorage.removeItem('admin_user');
+                    localStorage.removeItem('admin_time');
+                    
+                    sessionStorage.removeItem('admin_auth');
+                    sessionStorage.removeItem('admin_user');
+                    sessionStorage.removeItem('admin_time');
+                    
+                    // Redirecionar para login
+                    window.location.href = 'login.html';
+                    return false;
+                }
+                
+                console.log('✅ Autenticado!');
+                return true;
+            }
+            
+            // EXECUTAR VERIFICAÇÃO
+            if (!checkAuth()) {
+                console.log('⛔ Dashboard não carregado - Usuário não autenticado');
+                return;
+            }
+            
+            console.log('✅ Dashboard sendo carregado...');
+            
+            // Esconder overlay
+            setTimeout(() => {
+                if (authOverlay) {
+                    authOverlay.style.display = 'none';
+                }
+                
+                // Carregar nome do admin
+                const adminUser = localStorage.getItem('admin_user') || 'Administrador';
+                document.getElementById('adminUsername').textContent = adminUser;
+                
+                // Continuar carregamento
+                try {
+                    loadDashboard();
+                    setupEventListeners();
+                    setInterval(loadDashboard, 10000);
+                    console.log('✅ Dashboard completamente carregado');
+                } catch (error) {
+                    console.error('Erro ao carregar dashboard:', error);
+                }
+            }, 300);
         });
-        
-        // Se não autenticado ou sessão expirou (> 8 horas)
-        if ((!localAuth && !sessionAuth) || hoursDiff > 8) {
-            console.log('❌ Não autenticado ou sessão expirada');
-            
-            // Limpar tudo
-            localStorage.removeItem('admin_auth');
-            localStorage.removeItem('admin_user');
-            localStorage.removeItem('admin_time');
-            
-            sessionStorage.removeItem('admin_auth');
-            sessionStorage.removeItem('admin_user');
-            sessionStorage.removeItem('admin_time');
-            
-            // Redirecionar para login
-            window.location.href = 'login.html';
-            return false;
-        }
-        
-        console.log('✅ Autenticado!');
-        return true;
-    }
-    
-    // EXECUTAR VERIFICAÇÃO
-    if (!checkAuth()) {
-        console.log('⛔ Dashboard não carregado - Usuário não autenticado');
-        return;
-    }
-    
-    console.log('✅ Dashboard sendo carregado...');
-    
-    // Esconder overlay
-    setTimeout(() => {
-        if (authOverlay) {
-            authOverlay.style.display = 'none';
-        }
-        
-        // Carregar nome do admin
-        const adminUser = localStorage.getItem('admin_user') || 
-                         sessionStorage.getItem('admin_user') || 
-                         'Administrador';
-        document.getElementById('adminUsername').textContent = adminUser;
-        
-        // Continuar carregamento normal
-        try {
-            loadDashboard();
-            setupEventListeners();
-            setInterval(loadDashboard, 10000);
-            console.log('✅ Dashboard completamente carregado');
-        } catch (error) {
-            console.error('Erro ao carregar dashboard:', error);
-        }
-    }, 300);
-});
         
         function loadDashboard() {
             try {
                 console.log('Carregando dashboard...');
                 
-                // Carregar estado do sistema
-                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-                const savedAnalysts = savedState.analysts || [];
-                const appState = savedState.appState || {};
-                const queueOrder = savedState.queueOrder || [];
-                
-                // Mesclar dados dos analistas
-                const baseAnalysts = [
-                    { id: 1, name: "Analista 01", level: "N1", startTime: 8, endTime: 17 },
-                    { id: 2, name: "Analista 02", level: "N1", startTime: 8, endTime: 17 },
-                    { id: 3, name: "Analista 03", level: "N1", startTime: 8, endTime: 17 },
-                    { id: 4, name: "Analista 04", level: "N2", startTime: 9, endTime: 18 },
-                    { id: 5, name: "Analista 05", level: "N2", startTime: 9, endTime: 18 },
-                    { id: 6, name: "Analista 06", level: "N2", startTime: 9, endTime: 18 },
-                    { id: 7, name: "Analista 07", level: "N3", startTime: 10, endTime: 19 },
-                    { id: 8, name: "Analista 08", level: "N3", startTime: 10, endTime: 19 },
-                    { id: 9, name: "Analista 09", level: "N3", startTime: 10, endTime: 19 }
-                ];
-                
-                const analysts = baseAnalysts.map(baseAnalyst => {
-                    const savedAnalyst = savedAnalysts.find(a => a.id === baseAnalyst.id);
-                    return {
-                        ...baseAnalyst,
-                        isAvailable: savedAnalyst?.isAvailable || false,
-                        isBusy: savedAnalyst?.isBusy || false,
-                        currentTicket: savedAnalyst?.currentTicket || null,
-                        ticketStatus: savedAnalyst?.ticketStatus || null,
-                        ticketSpecialType: savedAnalyst?.ticketSpecialType || null,
-                        ticketsHandled: savedAnalyst?.ticketsHandled || 0,
-                        isWaitingForClient: savedAnalyst?.isWaitingForClient || false,
-                        lastActivity: savedAnalyst?.lastActivity || null,
-                        specialClient: savedAnalyst?.specialClient || null,
-                        inQueue: savedAnalyst?.inQueue !== undefined ? savedAnalyst.inQueue : baseAnalyst.level === "N1"
-                    };
-                });
-                
                 // Atualizar estatísticas
-                updateDashboardStats(analysts, appState, queueOrder);
+                updateDashboardStats();
                 
                 // Atualizar grid de analistas disponíveis
-                updateAvailableAnalystsGrid(analysts);
+                updateAvailableAnalystsGrid();
                 
                 // Atualizar status em tempo real
-                updateRealTimeStatus(analysts, queueOrder);
+                updateRealTimeStatus();
                 
                 // Atualizar hora
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('pt-BR');
@@ -656,11 +484,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        function updateDashboardStats(analysts, appState, queueOrder) {
-            const ticketsToday = appState.ticketsToday || 0;
+        function updateDashboardStats() {
+            if (!window.portal) return;
+            
+            const stats = window.portal.appState;
+            const analysts = window.portal.analysts || [];
+            
+            const ticketsToday = stats.ticketsToday || 0;
             const availableAnalysts = analysts.filter(a => a.isAvailable && !a.isBusy).length;
             const busyAnalysts = analysts.filter(a => a.isBusy).length;
-            const waitingQueue = queueOrder.length;
+            const waitingQueue = window.portal.queue ? window.portal.queue.length : 0;
             const specialClients = analysts.filter(a => a.specialClient && a.isBusy).length;
             
             document.getElementById('statTicketsToday').textContent = ticketsToday;
@@ -670,14 +503,39 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('statSpecialClients').textContent = specialClients;
         }
         
-        function updateAvailableAnalystsGrid(analysts) {
+        function updateAvailableAnalystsGrid() {
             const grid = document.getElementById('availableAnalystsGrid');
             if (!grid) return;
             
-            const availableAnalysts = analysts.filter(a => a.isAvailable && !a.isBusy);
+            if (!window.portal || !window.portal.analysts) {
+                grid.innerHTML = '<div class="empty-state">Sistema não carregado</div>';
+                return;
+            }
+            
+            const now = new Date();
+            const currentHour = now.getHours();
+            
+            // Filtrar analistas disponíveis no horário atual
+            const availableAnalysts = window.portal.analysts.filter(analyst => {
+                // Verificar horário
+                const inTime = currentHour >= analyst.startTime && currentHour < analyst.endTime;
+                if (!inTime) return false;
+                
+                // Verificar disponibilidade
+                return analyst.isAvailable && !analyst.isBusy;
+            });
+            
+            // Ordenar por horário de início
+            availableAnalysts.sort((a, b) => a.startTime - b.startTime);
             
             if (availableAnalysts.length === 0) {
-                grid.innerHTML = '<div class="empty-state">Nenhum analista disponível no momento</div>';
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 30px;">
+                        <i class="fas fa-clock" style="font-size: 40px; color: #6c757d; margin-bottom: 10px;"></i>
+                        <p style="color: #6c757d;">Nenhum analista disponível no horário atual</p>
+                        <small>Horário atual: ${currentHour}:00</small>
+                    </div>
+                `;
                 return;
             }
             
@@ -686,7 +544,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 html += `
                     <div class="analyst-select-card" data-analyst-id="${analyst.id}">
                         <h4>${analyst.name}</h4>
-                        <small>${analyst.level} • ${analyst.ticketsHandled || 0} tickets hoje</small>
+                        <small>
+                            ${analyst.level} • 
+                            ${analyst.startTime}h-${analyst.endTime}h • 
+                            ${analyst.ticketsHandled || 0} tickets hoje
+                            ${analyst.specialClient ? `<br><span class="special-tag">${analyst.specialClient}</span>` : ''}
+                        </small>
                     </div>
                 `;
             });
@@ -704,9 +567,17 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        function updateRealTimeStatus(analysts, queueOrder) {
+        function updateRealTimeStatus() {
             const container = document.getElementById('realTimeStatus');
             if (!container) return;
+            
+            if (!window.portal) {
+                container.innerHTML = '<div class="empty-state">Sistema não carregado</div>';
+                return;
+            }
+            
+            const analysts = window.portal.analysts || [];
+            const queue = window.portal.queue || [];
             
             // Analistas ocupados
             const busyAnalysts = analysts.filter(a => a.isBusy);
@@ -741,27 +612,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <div>
                         <div style="font-weight: 500; margin-bottom: 10px; color: #212529;">
-                            <i class="fas fa-list-ol"></i> Fila de Espera (${queueOrder.length})
+                            <i class="fas fa-list-ol"></i> Fila de Espera (${queue.length})
                         </div>
             `;
             
-            if (queueOrder.length === 0) {
+            if (queue.length === 0) {
                 html += '<div style="color: #6c757d; font-style: italic;">Fila vazia</div>';
             } else {
-                queueOrder.slice(0, 5).forEach((ticket, index) => {
+                queue.slice(0, 5).forEach((analyst, index) => {
                     html += `
                         <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 8px;">
-                            <div style="font-weight: 500;">Ticket #${ticket.number}</div>
+                            <div style="font-weight: 500;">${analyst.name}</div>
                             <div style="font-size: 12px; color: #6c757d;">
-                                Posição: ${index + 1} • ${ticket.type || 'Normal'}
+                                Posição: ${index + 1} • ${analyst.startTime}h-${analyst.endTime}h
+                                <br>${analyst.ticketsHandled || 0} tickets hoje
                             </div>
                         </div>
                     `;
                 });
                 
-                if (queueOrder.length > 5) {
+                if (queue.length > 5) {
                     html += `<div style="font-size: 12px; color: #6c757d; margin-top: 5px;">
-                                +${queueOrder.length - 5} tickets na fila
+                                +${queue.length - 5} analistas na fila
                             </div>`;
                 }
             }
@@ -778,530 +650,99 @@ document.addEventListener('DOMContentLoaded', function() {
             // Logout
             document.getElementById('logoutBtn').addEventListener('click', function() {
                 if (confirm('Deseja realmente sair do painel administrativo?')) {
-                    sessionStorage.removeItem('admin_authenticated');
-                    sessionStorage.removeItem('admin_username');
-                    sessionStorage.removeItem('admin_login_time');
+                    localStorage.removeItem('admin_auth');
+                    localStorage.removeItem('admin_user');
+                    localStorage.removeItem('admin_time');
                     window.location.href = 'login.html';
                 }
             });
             
             // Adicionar ticket
-            document.getElementById('addTicketBtn').addEventListener('click', showAddTicketModal);
-            document.getElementById('closeTicketModal').addEventListener('click', hideAddTicketModal);
-            document.getElementById('cancelAddTicket').addEventListener('click', hideAddTicketModal);
-            document.getElementById('confirmAddTicket').addEventListener('click', addNewTicket);
+            document.getElementById('addTicketBtn').addEventListener('click', function() {
+                const ticketNumber = prompt('Digite o número do ticket:');
+                if (ticketNumber && ticketNumber.trim()) {
+                    const ticketType = prompt('Tipo de cliente (normal/TIM/DPSP/Benoit):', 'normal');
+                    if (window.portal) {
+                        window.portal.assignTicket(ticketNumber.trim(), ticketType || 'normal');
+                    }
+                }
+            });
             
             // Avançar fila
-            document.getElementById('advanceQueueBtn').addEventListener('click', advanceQueue);
+            document.getElementById('advanceQueueBtn').addEventListener('click', function() {
+                if (window.portal) {
+                    const nextAnalyst = window.portal.getNextAnalyst();
+                    if (nextAnalyst) {
+                        const ticketNumber = prompt(`Atribuir ticket para ${nextAnalyst.name}:`);
+                        if (ticketNumber && ticketNumber.trim()) {
+                            window.portal.assignToAnalyst(nextAnalyst.id, ticketNumber.trim(), 'normal');
+                        }
+                    } else {
+                        alert('Não há analistas disponíveis na fila');
+                    }
+                }
+            });
             
             // Finalizar ticket
-            document.getElementById('finishTicketBtn').addEventListener('click', showFinishTicketModal);
+            document.getElementById('finishTicketBtn').addEventListener('click', function() {
+                if (window.portal && window.portal.analysts) {
+                    const busyAnalysts = window.portal.analysts.filter(a => a.isBusy);
+                    if (busyAnalysts.length === 0) {
+                        alert('Nenhum ticket em andamento');
+                        return;
+                    }
+                    
+                    let options = 'Selecione o analista para finalizar:\n\n';
+                    busyAnalysts.forEach((analyst, index) => {
+                        options += `${index + 1}. ${analyst.name} - Ticket: ${analyst.currentTicket}\n`;
+                    });
+                    
+                    const choice = prompt(options);
+                    if (choice && !isNaN(choice)) {
+                        const index = parseInt(choice) - 1;
+                        if (index >= 0 && index < busyAnalysts.length) {
+                            window.portal.finishTicket(busyAnalysts[index].id);
+                        }
+                    }
+                }
+            });
             
             // Reiniciar dia
-            document.getElementById('resetDayBtn').addEventListener('click', resetDay);
+            document.getElementById('resetDayBtn').addEventListener('click', function() {
+                if (confirm('Deseja realmente reiniciar o dia?\n\nIsso irá zerar todas as estatísticas e liberar analistas.')) {
+                    if (window.portal) {
+                        window.portal.resetDay();
+                    }
+                }
+            });
             
             // Atribuir cliente especial
-            document.getElementById('assignSpecialBtn').addEventListener('click', assignSpecialClient);
-        }
-        
-        function showAddTicketModal() {
-            const modal = document.getElementById('addTicketModal');
-            modal.style.display = 'flex';
-            
-            // Limpar campos
-            document.getElementById('ticketNumber').value = '';
-            
-            // Carregar analistas disponíveis para o select
-            loadAvailableAnalystsForSelect();
-            
-            // Focar no campo de número
-            setTimeout(() => {
-                document.getElementById('ticketNumber').focus();
-            }, 100);
-        }
-        
-        function hideAddTicketModal() {
-            document.getElementById('addTicketModal').style.display = 'none';
-        }
-        
-        function loadAvailableAnalystsForSelect() {
-            const select = document.getElementById('assignTo');
-            select.innerHTML = '<option value="queue">Adicionar à Fila de Espera</option>';
-            
-            // Carregar analistas disponíveis
-            const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-            const savedAnalysts = savedState.analysts || [];
-            
-            const baseAnalysts = [
-                { id: 1, name: "Analista 01", level: "N1" },
-                { id: 2, name: "Analista 02", level: "N1" },
-                { id: 3, name: "Analista 03", level: "N1" },
-                { id: 4, name: "Analista 04", level: "N2" },
-                { id: 5, name: "Analista 05", level: "N2" },
-                { id: 6, name: "Analista 06", level: "N2" },
-                { id: 7, name: "Analista 07", level: "N3" },
-                { id: 8, name: "Analista 08", level: "N3" },
-                { id: 9, name: "Analista 09", level: "N3" }
-            ];
-            
-            const analysts = baseAnalysts.map(baseAnalyst => {
-                const savedAnalyst = savedAnalysts.find(a => a.id === baseAnalyst.id);
-                return {
-                    ...baseAnalyst,
-                    isAvailable: savedAnalyst?.isAvailable || false,
-                    isBusy: savedAnalyst?.isBusy || false
-                };
-            });
-            
-            const availableAnalysts = analysts.filter(a => a.isAvailable && !a.isBusy);
-            
-            availableAnalysts.forEach(analyst => {
-                const option = document.createElement('option');
-                option.value = analyst.id;
-                option.textContent = `${analyst.name} (${analyst.level})`;
-                select.appendChild(option);
-            });
-            
-            // Atualizar info quando selecionar analista
-            select.addEventListener('change', function() {
-                const analystId = this.value;
-                const infoDiv = document.getElementById('analystStatusInfo');
-                const statusDiv = document.getElementById('selectedAnalystStatus');
+            document.getElementById('assignSpecialBtn').addEventListener('click', function() {
+                const ticketNumber = document.getElementById('specialTicketNumber').value.trim();
+                const clientType = document.getElementById('specialClientType').value;
+                const selectedAnalystCard = document.querySelector('.analyst-select-card.selected');
                 
-                if (analystId === 'queue') {
-                    infoDiv.style.display = 'none';
+                if (!ticketNumber) {
+                    showNotification('Digite o número do ticket', 'error');
                     return;
                 }
                 
-                const analyst = analysts.find(a => a.id === parseInt(analystId));
-                if (analyst) {
-                    infoDiv.style.display = 'block';
-                    statusDiv.innerHTML = `
-                        <strong>${analyst.name}</strong> (${analyst.level})<br>
-                        Status: Disponível • Tickets hoje: ${analyst.ticketsHandled || 0}
-                    `;
-                }
-            });
-        }
-        
-        function addNewTicket() {
-            const ticketNumber = document.getElementById('ticketNumber').value.trim();
-            const ticketType = document.getElementById('ticketType').value;
-            const assignTo = document.getElementById('assignTo').value;
-            
-            if (!ticketNumber) {
-                showNotification('Digite o número do ticket', 'error');
-                return;
-            }
-            
-            try {
-                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-                const appState = savedState.appState || {};
-                const queueOrder = savedState.queueOrder || [];
-                const savedAnalysts = savedState.analysts || [];
-                
-                // Atualizar contador de tickets
-                appState.ticketsToday = (appState.ticketsToday || 0) + 1;
-                
-                if (assignTo === 'queue') {
-                    // Adicionar à fila de espera
-                    queueOrder.push({
-                        number: ticketNumber,
-                        type: ticketType === 'normal' ? null : ticketType,
-                        addedAt: new Date().toISOString()
-                    });
-                    
-                    showNotification(`Ticket #${ticketNumber} adicionado à fila de espera`, 'success');
+                if (selectedAnalystCard) {
+                    // Atribuir ao analista selecionado
+                    const analystId = parseInt(selectedAnalystCard.getAttribute('data-analyst-id'));
+                    if (window.portal) {
+                        window.portal.assignToAnalyst(analystId, ticketNumber, clientType);
+                    }
                 } else {
-                    // Atribuir diretamente a um analista
-                    const analystId = parseInt(assignTo);
-                    const analystIndex = savedAnalysts.findIndex(a => a.id === analystId);
-                    
-                    if (analystIndex !== -1) {
-                        savedAnalysts[analystIndex].isBusy = true;
-                        savedAnalysts[analystIndex].currentTicket = ticketNumber;
-                        savedAnalysts[analystIndex].ticketStatus = 'Em atendimento';
-                        savedAnalysts[analystIndex].ticketSpecialType = ticketType === 'normal' ? null : ticketType;
-                        savedAnalysts[analystIndex].specialClient = ticketType === 'normal' ? null : ticketType;
-                        savedAnalysts[analystIndex].lastActivity = new Date().toISOString();
-                        savedAnalysts[analystIndex].ticketsHandled = (savedAnalysts[analystIndex].ticketsHandled || 0) + 1;
-                        
-                        // Salvar no Firebase se disponível
-                        if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
-                            window.firebaseAppIntegration.saveTicketToFirebase(
-                                ticketNumber,
-                                savedAnalysts[analystIndex].name,
-                                'iniciado',
-                                ticketType === 'normal' ? 'normal' : 'especial'
-                            );
-                        }
-                        
-                        showNotification(`Ticket #${ticketNumber} atribuído ao analista`, 'success');
+                    // Usar lógica normal (encontrará o analista correto para o cliente especial)
+                    if (window.portal) {
+                        window.portal.assignTicket(ticketNumber, clientType);
                     }
                 }
                 
-                // Salvar estado atualizado
-                savedState.appState = appState;
-                savedState.queueOrder = queueOrder;
-                savedState.analysts = savedAnalysts;
-                savedState.lastUpdate = new Date().toISOString();
-                
-                localStorage.setItem('queue_state', JSON.stringify(savedState));
-                
-                // Fechar modal e atualizar dashboard
-                hideAddTicketModal();
-                loadDashboard();
-                
-            } catch (error) {
-                console.error('Erro ao adicionar ticket:', error);
-                showNotification('Erro ao adicionar ticket', 'error');
-            }
-        }
-        
-        function advanceQueue() {
-            try {
-                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-                const queueOrder = savedState.queueOrder || [];
-                const savedAnalysts = savedState.analysts || [];
-                
-                if (queueOrder.length === 0) {
-                    showNotification('Não há tickets na fila de espera', 'warning');
-                    return;
-                }
-                
-                // Encontrar primeiro analista disponível
-                const availableAnalyst = savedAnalysts.find(a => a.isAvailable && !a.isBusy);
-                
-                if (!availableAnalyst) {
-                    showNotification('Não há analistas disponíveis no momento', 'warning');
-                    return;
-                }
-                
-                // Remover primeiro ticket da fila
-                const nextTicket = queueOrder.shift();
-                const analystIndex = savedAnalysts.findIndex(a => a.id === availableAnalyst.id);
-                
-                if (analystIndex !== -1) {
-                    // Atribuir ticket ao analista
-                    savedAnalysts[analystIndex].isBusy = true;
-                    savedAnalysts[analystIndex].currentTicket = nextTicket.number;
-                    savedAnalysts[analystIndex].ticketStatus = 'Em atendimento';
-                    savedAnalysts[analystIndex].ticketSpecialType = nextTicket.type || null;
-                    savedAnalysts[analystIndex].specialClient = nextTicket.type || null;
-                    savedAnalysts[analystIndex].lastActivity = new Date().toISOString();
-                    savedAnalysts[analystIndex].ticketsHandled = (savedAnalysts[analystIndex].ticketsHandled || 0) + 1;
-                    
-                    // Salvar no Firebase se disponível
-                    if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
-                        window.firebaseAppIntegration.saveTicketToFirebase(
-                            nextTicket.number,
-                            savedAnalysts[analystIndex].name,
-                            'iniciado',
-                            nextTicket.type ? 'especial' : 'normal'
-                        );
-                    }
-                    
-                    // Atualizar estado
-                    savedState.queueOrder = queueOrder;
-                    savedState.analysts = savedAnalysts;
-                    savedState.lastUpdate = new Date().toISOString();
-                    
-                    localStorage.setItem('queue_state', JSON.stringify(savedState));
-                    
-                    showNotification(`Ticket #${nextTicket.number} atribuído a ${savedAnalysts[analystIndex].name}`, 'success');
-                    loadDashboard();
-                }
-                
-            } catch (error) {
-                console.error('Erro ao avançar fila:', error);
-                showNotification('Erro ao avançar fila', 'error');
-            }
-        }
-        
-        function showFinishTicketModal() {
-            // Criar modal dinâmico para finalizar tickets
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
-            modal.style.display = 'flex';
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <div class="modal-title">
-                            <i class="fas fa-check-circle"></i>
-                            Finalizar Ticket
-                        </div>
-                        <button class="close-modal" id="closeFinishModal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div id="busyAnalystsList">
-                            <div class="loading">
-                                <div class="loading-spinner"></div>
-                                <span>Carregando analistas ocupados...</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-actions">
-                        <button class="btn" id="cancelFinish">Cancelar</button>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-            
-            // Carregar analistas ocupados
-            setTimeout(() => {
-                loadBusyAnalystsForFinish();
-            }, 100);
-            
-            // Event listeners
-            modal.querySelector('#closeFinishModal').addEventListener('click', () => modal.remove());
-            modal.querySelector('#cancelFinish').addEventListener('click', () => modal.remove());
-        }
-        
-        function loadBusyAnalystsForFinish() {
-            const container = document.querySelector('#busyAnalystsList');
-            if (!container) return;
-            
-            try {
-                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-                const savedAnalysts = savedState.analysts || [];
-                
-                const busyAnalysts = savedAnalysts.filter(a => a.isBusy);
-                
-                if (busyAnalysts.length === 0) {
-                    container.innerHTML = '<div class="empty-state">Nenhum analista com ticket ativo</div>';
-                    return;
-                }
-                
-                let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
-                busyAnalysts.forEach(analyst => {
-                    html += `
-                        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="font-weight: 500;">${analyst.name}</div>
-                                <div style="font-size: 12px; color: #6c757d;">
-                                    Ticket: ${analyst.currentTicket || 'N/A'}
-                                    ${analyst.specialClient ? ` • ${analyst.specialClient}` : ''}
-                                </div>
-                            </div>
-                            <button class="btn btn-success btn-small finish-ticket-btn" data-analyst-id="${analyst.id}">
-                                <i class="fas fa-check"></i>
-                                Finalizar
-                            </button>
-                        </div>
-                    `;
-                });
-                html += '</div>';
-                
-                container.innerHTML = html;
-                
-                // Adicionar event listeners aos botões
-                document.querySelectorAll('.finish-ticket-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const analystId = parseInt(this.getAttribute('data-analyst-id'));
-                        finishTicket(analystId);
-                        this.closest('.modal-overlay').remove();
-                    });
-                });
-                
-            } catch (error) {
-                console.error('Erro ao carregar analistas:', error);
-                container.innerHTML = '<div class="empty-state">Erro ao carregar analistas</div>';
-            }
-        }
-        
-        function finishTicket(analystId) {
-            try {
-                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-                const savedAnalysts = savedState.analysts || [];
-                const analystIndex = savedAnalysts.findIndex(a => a.id === analystId);
-                
-                if (analystIndex === -1) {
-                    showNotification('Analista não encontrado', 'error');
-                    return;
-                }
-                
-                const analyst = savedAnalysts[analystIndex];
-                const ticketNumber = analyst.currentTicket;
-                
-                // Atualizar status do analista
-                savedAnalysts[analystIndex].isBusy = false;
-                savedAnalysts[analystIndex].currentTicket = null;
-                savedAnalysts[analystIndex].ticketStatus = null;
-                savedAnalysts[analystIndex].ticketSpecialType = null;
-                savedAnalysts[analystIndex].isWaitingForClient = false;
-                savedAnalysts[analystIndex].specialClient = null;
-                savedAnalysts[analystIndex].lastActivity = new Date().toISOString();
-                
-                // Atualizar estado
-                savedState.analysts = savedAnalysts;
-                savedState.lastUpdate = new Date().toISOString();
-                
-                localStorage.setItem('queue_state', JSON.stringify(savedState));
-                
-                // Atualizar no Firebase se disponível
-                if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized && ticketNumber) {
-                    window.firebaseAppIntegration.updateTicketStatus(
-                        ticketNumber,
-                        'finalizado',
-                        analyst.name
-                    );
-                }
-                
-                showNotification(`Ticket #${ticketNumber} finalizado`, 'success');
-                loadDashboard();
-                
-            } catch (error) {
-                console.error('Erro ao finalizar ticket:', error);
-                showNotification('Erro ao finalizar ticket', 'error');
-            }
-        }
-        
-        function resetDay() {
-            if (!confirm('Deseja realmente reiniciar o dia?\n\nEsta ação irá:\n• Zerar todas as estatísticas\n• Limpar a fila de espera\n• Liberar todos os analistas\n• Manter apenas os dados históricos')) {
-                return;
-            }
-            
-            try {
-                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-                const baseAnalysts = [
-                    { id: 1, name: "Analista 01", level: "N1", startTime: 8, endTime: 17 },
-                    { id: 2, name: "Analista 02", level: "N1", startTime: 8, endTime: 17 },
-                    { id: 3, name: "Analista 03", level: "N1", startTime: 8, endTime: 17 },
-                    { id: 4, name: "Analista 04", level: "N2", startTime: 9, endTime: 18 },
-                    { id: 5, name: "Analista 05", level: "N2", startTime: 9, endTime: 18 },
-                    { id: 6, name: "Analista 06", level: "N2", startTime: 9, endTime: 18 },
-                    { id: 7, name: "Analista 07", level: "N3", startTime: 10, endTime: 19 },
-                    { id: 8, name: "Analista 08", level: "N3", startTime: 10, endTime: 19 },
-                    { id: 9, name: "Analista 09", level: "N3", startTime: 10, endTime: 19 }
-                ];
-                
-                // Resetar estado
-                const resetState = {
-                    appState: {
-                        ticketsToday: 0,
-                        specialTicketsToday: 0,
-                        waitingTicketsToday: 0,
-                        lastReset: new Date().toLocaleDateString('pt-BR'),
-                        nextTicketNumber: 1000
-                    },
-                    analysts: baseAnalysts.map(a => ({
-                        id: a.id,
-                        name: a.name,
-                        level: a.level,
-                        startTime: a.startTime,
-                        endTime: a.endTime,
-                        isAvailable: false,
-                        isBusy: false,
-                        currentTicket: null,
-                        ticketStatus: null,
-                        ticketSpecialType: null,
-                        ticketsHandled: 0,
-                        isWaitingForClient: false,
-                        inQueue: a.level === "N1",
-                        lastActivity: null,
-                        specialClient: null
-                    })),
-                    queueOrder: [],
-                    version: '3.5.0',
-                    resetTime: new Date().toISOString(),
-                    lastUpdate: new Date().toISOString()
-                };
-                
-                // Preservar dados históricos se existirem
-                if (savedState.history) {
-                    resetState.history = savedState.history;
-                }
-                
-                localStorage.setItem('queue_state', JSON.stringify(resetState));
-                
-                showNotification('Dia reiniciado com sucesso!', 'success');
-                loadDashboard();
-                
-            } catch (error) {
-                console.error('Erro ao reiniciar dia:', error);
-                showNotification('Erro ao reiniciar dia', 'error');
-            }
-        }
-        
-        function assignSpecialClient() {
-            const ticketNumber = document.getElementById('specialTicketNumber').value.trim();
-            const clientType = document.getElementById('specialClientType').value;
-            const selectedAnalystCard = document.querySelector('.analyst-select-card.selected');
-            
-            if (!ticketNumber) {
-                showNotification('Digite o número do ticket', 'error');
-                return;
-            }
-            
-            if (!selectedAnalystCard) {
-                showNotification('Selecione um analista disponível', 'error');
-                return;
-            }
-            
-            const analystId = parseInt(selectedAnalystCard.getAttribute('data-analyst-id'));
-            
-            try {
-                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-                const savedAnalysts = savedState.analysts || [];
-                const appState = savedState.appState || {};
-                
-                const analystIndex = savedAnalysts.findIndex(a => a.id === analystId);
-                
-                if (analystIndex === -1) {
-                    showNotification('Analista não encontrado', 'error');
-                    return;
-                }
-                
-                // Verificar se analista está disponível
-                if (savedAnalysts[analystIndex].isBusy) {
-                    showNotification('Este analista já está ocupado', 'warning');
-                    return;
-                }
-                
-                // Atualizar analista
-                savedAnalysts[analystIndex].isBusy = true;
-                savedAnalysts[analystIndex].currentTicket = ticketNumber;
-                savedAnalysts[analystIndex].ticketStatus = 'Em atendimento';
-                savedAnalysts[analystIndex].ticketSpecialType = clientType;
-                savedAnalysts[analystIndex].specialClient = clientType;
-                savedAnalysts[analystIndex].lastActivity = new Date().toISOString();
-                savedAnalysts[analystIndex].ticketsHandled = (savedAnalysts[analystIndex].ticketsHandled || 0) + 1;
-                
-                // Atualizar estatísticas
-                appState.ticketsToday = (appState.ticketsToday || 0) + 1;
-                appState.specialTicketsToday = (appState.specialTicketsToday || 0) + 1;
-                
-                // Salvar estado
-                savedState.appState = appState;
-                savedState.analysts = savedAnalysts;
-                savedState.lastUpdate = new Date().toISOString();
-                
-                localStorage.setItem('queue_state', JSON.stringify(savedState));
-                
-                // Salvar no Firebase se disponível
-                if (window.firebaseAppIntegration && window.firebaseAppIntegration.initialized) {
-                    window.firebaseAppIntegration.saveTicketToFirebase(
-                        ticketNumber,
-                        savedAnalysts[analystIndex].name,
-                        'iniciado',
-                        'especial'
-                    );
-                }
-                
-                // Limpar campos
+                // Limpar campo
                 document.getElementById('specialTicketNumber').value = '';
-                document.querySelectorAll('.analyst-select-card').forEach(c => {
-                    c.classList.remove('selected');
-                });
-                
-                showNotification(`Cliente especial ${clientType} atribuído com sucesso!`, 'success');
-                loadDashboard();
-                
-            } catch (error) {
-                console.error('Erro ao atribuir cliente especial:', error);
-                showNotification('Erro ao atribuir cliente especial', 'error');
-            }
+            });
         }
         
         function updateFirebaseStatus() {
