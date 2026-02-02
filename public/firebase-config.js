@@ -18,7 +18,8 @@ let isMock = false;
 
 try {
     if (typeof firebase !== 'undefined' && firebase.app) {
-        firebaseApp = firebase.initializeApp(firebaseConfig);
+        // CORREÇÃO AQUI: Usar FIREBASE_CONFIG (maiúsculo)
+        firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
         console.log('✅ Firebase inicializado com sucesso');
     } else {
         throw new Error('Firebase SDK não carregado');
@@ -64,8 +65,9 @@ try {
 }
 
 // Configuração global
+// CORREÇÃO AQUI: Usar FIREBASE_CONFIG ao invés de firebaseConfig
 window.firebaseConfig = {
-    config: firebaseConfig,
+    config: FIREBASE_CONFIG,  // <-- CORRIGIDO!
     app: firebaseApp,
     isMock: isMock,
     
