@@ -1,12 +1,8 @@
 // ============================================
-// CONFIGURAÇÃO DO FIREBASE - PAYHUB QUEUE PORTAL
+// CONFIGURAÇÃO FIREBASE - PORTAL PAYHUB
 // ============================================
 
-// Versão da aplicação
-const APP_VERSION = '3.5.0';
-const APP_ENV = getEnvironment();
-
-// Configurações do Firebase
+// Configuração do Firebase
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCJXxaG8R5-VmkoGA7PyFcyfcvBAk92yTc",
   authDomain: "portal-fila-payhub.firebaseapp.com",
@@ -16,276 +12,95 @@ const FIREBASE_CONFIG = {
   appId: "1:28871537008:web:38d6ac22721f40a7d61fb5"
 };
 
-// Detectar ambiente
-function getEnvironment() {
-  const hostname = window.location.hostname;
-  
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'development';
-  } else if (hostname.includes('test') || hostname.includes('staging')) {
-    return 'staging';
-  } else {
-    return 'production';
-  }
-}
+// Inicializar Firebase
+let firebaseApp;
+let isMock = false;
 
-// Log de inicialização
-function logInitialization(env) {
-  console.log(`🚀 Portal Payhub - v${APP_VERSION}`);
-  console.log(`🌍 Ambiente: ${env}`);
-  console.log(`🕒 ${new Date().toLocaleString('pt-BR')}`);
-  
-  if (env === 'development') {
-    console.log('🔧 Modo desenvolvimento ativo');
-  }
-}
-
-// Verificar se já foi inicializado
-function isAlreadyInitialized() {
-  if (typeof firebase === 'undefined') return false;
-  
-  try {
-    return firebase.apps.length > 0;
-  } catch (error) {
-    return false;
-  }
-}
-
-// Modificar a função initializeFirebaseApp:
-function initializeFirebaseApp() {
-  // Verificar se Firebase SDK foi carregado
-  if (typeof firebase === 'undefined') {
-    console.error('❌ Firebase SDK não foi carregado');
-    return null;
-  }
-  
-  // Verificar se já foi inicializado
-  if (isAlreadyInitialized()) {
-    console.log('✅ Firebase já foi inicializado anteriormente, reusando...');
-    const app = firebase.app();
-    return {
-      app: app,
-      db: firebase.firestore(app),
-      auth: firebase.auth(app),
-      firebase: firebase,
-      config: FIREBASE_CONFIG,
-      environment: APP_ENV,
-      isMock: false,
-      isReused: true
-    };
-  }
-  
-  try {
-    // Inicializar Firebase App
-    const app = firebase.initializeApp(FIREBASE_CONFIG);
-    console.log('✅ Firebase inicializado com sucesso');
-    
-    // Configurar Firestore
-    const db = firebase.firestore(app);
-    
-    // Configurações para desenvolvimento
-    if (APP_ENV === 'development') {
-      db.settings({
-        cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-      });
+try {
+    if (typeof firebase !== 'undefined' && firebase.app) {
+        firebaseApp = firebase.initializeApp(firebaseConfig);
+        console.log('✅ Firebase inicializado com sucesso');
+    } else {
+        throw new Error('Firebase SDK não carregado');
     }
+} catch (error) {
+    console.warn('⚠️ Firebase não disponível, usando modo offline:', error.message);
     
-    // Configurar Auth
-    const auth = firebase.auth(app);
-    
-    // TENTAR ativar persistência (mas não bloquear se falhar)
-    setTimeout(() => {
-      try {
-        db.enablePersistence()
-          .then(() => {
-            console.log('✅ Persistência offline ativada');
-          })
-          .catch((err) => {
-            if (err.code === 'failed-precondition') {
-              console.warn('⚠️ Múltiplas abas abertas - Persistência limitada');
-            } else if (err.code === 'unimplemented') {
-              console.warn('⚠️ Persistência não suportada pelo navegador');
-            } else {
-              console.warn('⚠️ Persistência não pôde ser ativada:', err.message);
-            }
-          });
-      } catch (error) {
-        console.warn('⚠️ Não foi possível ativar persistência:', error.message);
-      }
-    }, 1000);
-    
-    return {
-      app: app,
-      db: db,
-      auth: auth,
-      firebase: firebase,
-      config: FIREBASE_CONFIG,
-      environment: APP_ENV,
-      isMock: false,
-      isReused: false
-    };
-    
-  } catch (error) {
-    console.error('❌ Erro ao inicializar Firebase:', error);
-    
-    // Fallback para desenvolvimento
-    if (APP_ENV === 'development') {
-      console.warn('⚠️ Criando mock do Firebase');
-      return createFirebaseMock();
-    }
-    
-    return null;
-  }
-}
-
-// Mock para desenvolvimento offline
-function createFirebaseMock() {
-  console.warn('⚠️ Usando MOCK do Firebase - Dados apenas locais');
-  
-  return {
-    app: { name: '[MOCK] Firebase App' },
-    db: {
-      collection: () => ({
-        doc: () => ({
-          get: () => Promise.resolve({ exists: false, data: () => null }),
-          set: () => Promise.resolve(),
-          update: () => Promise.resolve(),
-          delete: () => Promise.resolve()
+    // Mock para desenvolvimento offline
+    firebaseApp = {
+        isMock: true,
+        firestore: () => ({
+            collection: () => ({
+                doc: () => ({
+                    get: () => Promise.resolve({ exists: false, data: () => null }),
+                    set: () => Promise.resolve(),
+                    update: () => Promise.resolve(),
+                    delete: () => Promise.resolve()
+                }),
+                add: () => Promise.resolve({ id: 'mock-id' }),
+                get: () => Promise.resolve({ empty: true, docs: [] }),
+                where: () => ({
+                    get: () => Promise.resolve({ empty: true, docs: [] }),
+                    orderBy: () => ({
+                        get: () => Promise.resolve({ empty: true, docs: [] })
+                    })
+                }),
+                orderBy: () => ({
+                    get: () => Promise.resolve({ empty: true, docs: [] }),
+                    limit: () => ({
+                        get: () => Promise.resolve({ empty: true, docs: [] })
+                    })
+                })
+            })
         }),
-        get: () => Promise.resolve({ docs: [], forEach: () => {} }),
-        add: () => Promise.resolve({ id: 'mock-' + Date.now() }),
-        where: () => ({ get: () => Promise.resolve({ docs: [], forEach: () => {} }) }),
-        orderBy: () => ({ get: () => Promise.resolve({ docs: [], forEach: () => {} }) }),
-        limit: () => ({ get: () => Promise.resolve({ docs: [], forEach: () => {} }) }),
-        onSnapshot: () => () => {}
-      }),
-      batch: () => ({
-        set: () => {},
-        delete: () => {},
-        commit: () => Promise.resolve()
-      }),
-      enablePersistence: () => Promise.resolve()
-    },
-    auth: {
-      onAuthStateChanged: (callback) => {
-        setTimeout(() => callback(null), 100);
-        return () => {};
-      }
-    },
-    firebase: null,
-    config: FIREBASE_CONFIG,
-    environment: 'mock',
-    isMock: true,
-    isReused: false
-  };
-}
-
-// Monitorar conexão
-function setupConnectionMonitoring(firebaseApp) {
-  if (!firebaseApp || firebaseApp.isMock) return;
-  
-  try {
-    // Monitorar conexão de forma simples
-    const connectionRef = firebaseApp.db.collection('_connections').doc('monitor');
-    
-    // Testar conexão inicial
-    setTimeout(() => {
-      connectionRef.set({
-        lastCheck: new Date().toISOString(),
-        status: 'online'
-      }, { merge: true })
-        .then(() => {
-          console.log('✅ Rede habilitada');
-          updateConnectionStatus(true);
+        auth: () => ({
+            currentUser: null,
+            signInWithEmailAndPassword: () => Promise.reject(new Error('Modo offline')),
+            signOut: () => Promise.resolve()
         })
-        .catch((error) => {
-          console.error('❌ Erro ao testar conexão:', error);
-          updateConnectionStatus(false);
-        });
-    }, 2000);
+    };
     
-    // Verificar conexão periodicamente de forma mais simples
-    setInterval(() => {
-      connectionRef.get()
-        .then(() => updateConnectionStatus(true))
-        .catch(() => updateConnectionStatus(false));
-    }, 30000);
-    
-  } catch (error) {
-    console.error('❌ Erro ao configurar monitoramento:', error);
-  }
+    isMock = true;
 }
 
-// Atualizar status na interface
-function updateConnectionStatus(isConnected) {
-  const statusElement = document.getElementById('firebaseStatus');
-  if (!statusElement) return;
-  
-  if (isConnected) {
-    statusElement.innerHTML = '<i class="fas fa-plug"></i> Conectado';
-    statusElement.className = 'firebase-status connected';
-  } else {
-    statusElement.innerHTML = '<i class="fas fa-unlink"></i> Offline';
-    statusElement.className = 'firebase-status disconnected';
-  }
-}
-
-// ============================================
-// INICIALIZAÇÃO AUTOMÁTICA
-// ============================================
-
-// Aguardar DOM
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('📄 DOM carregado - Inicializando Firebase...');
-  
-  logInitialization(APP_ENV);
-  
-  const firebaseApp = initializeFirebaseApp();
-  window.firebaseApp = firebaseApp;
-  
-  if (firebaseApp && !firebaseApp.isMock) {
-    setupConnectionMonitoring(firebaseApp);
-    
-    if (firebaseApp.isReused) {
-      console.log('ℹ️ Firebase reutilizado de inicialização anterior');
-    }
-  } else if (firebaseApp?.isMock) {
-    const statusElement = document.getElementById('firebaseStatus');
-    if (statusElement) {
-      statusElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Modo Offline';
-      statusElement.className = 'firebase-status disconnected';
-    }
-  }
-});
-
-// ============================================
-// FUNÇÕES UTILITÁRIAS
-// ============================================
-
-// Verificar se Firebase está disponível
-function isFirebaseAvailable() {
-  return window.firebaseApp && !window.firebaseApp.isMock;
-}
-
-// Obter referências principais
-function getFirebaseRefs() {
-  const app = window.firebaseApp;
-  if (!app) return null;
-  
-  return {
-    db: app.db,
-    auth: app.auth,
-    isOnline: !app.isMock
-  };
-}
-
-// Exportar para uso global
+// Configuração global
 window.firebaseConfig = {
-  initializeFirebaseApp,
-  getFirebaseRefs,
-  isFirebaseAvailable,
-  APP_VERSION,
-  APP_ENV
+    config: firebaseConfig,
+    app: firebaseApp,
+    isMock: isMock,
+    
+    getFirebaseRefs: function() {
+        if (isMock) {
+            return {
+                db: firebaseApp.firestore(),
+                auth: firebaseApp.auth(),
+                isMock: true
+            };
+        }
+        
+        return {
+            db: firebase.firestore(),
+            auth: firebase.auth(),
+            isMock: false
+        };
+    },
+    
+    testConnection: async function() {
+        if (isMock) {
+            return { connected: false, mode: 'offline' };
+        }
+        
+        try {
+            const db = firebase.firestore();
+            await db.collection('_tests').doc('connection').set({
+                test: true,
+                timestamp: new Date().toISOString()
+            });
+            return { connected: true, mode: 'online' };
+        } catch (error) {
+            return { connected: false, mode: 'error', error: error.message };
+        }
+    }
 };
 
-console.log('✅ firebase-config.js carregado');
+console.log('✅ Configuração Firebase carregada');
