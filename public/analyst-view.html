@@ -11,10 +11,6 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    
     <!-- Estilos -->
     <link rel="stylesheet" href="style.css">
     
@@ -263,7 +259,7 @@
                 <h1>
                     <i class="fas fa-eye"></i>
                     Visualização de Status
-                    <span class="version-badge">v3.5.0</span>
+                    <span class="version-badge">v4.0.0</span>
                 </h1>
                 <p>Monitoramento em tempo real - Modo Consulta</p>
             </div>
@@ -359,7 +355,7 @@
         </div>
         
         <div class="footer">
-            <p><strong>Portal Payhub - Modo Consulta</strong> | v3.5.0</p>
+            <p><strong>Portal Payhub - Modo Consulta</strong> | v4.0.0</p>
             <p>Última atualização: <span id="updateTime">--:--:--</span></p>
             <p class="last-reset">Apenas visualização - Sem permissão de modificação</p>
         </div>
@@ -369,19 +365,6 @@
     <script src="firebase-config.js"></script>
     <script src="firebase-app.js"></script>
     <script>
-        // Dados dos analistas (base)
-        window.analysts = [
-            { id: 1, name: "Analista 01", level: "N1", startTime: 8, endTime: 17 },
-            { id: 2, name: "Analista 02", level: "N1", startTime: 8, endTime: 17 },
-            { id: 3, name: "Analista 03", level: "N1", startTime: 8, endTime: 17 },
-            { id: 4, name: "Analista 04", level: "N2", startTime: 9, endTime: 18 },
-            { id: 5, name: "Analista 05", level: "N2", startTime: 9, endTime: 18 },
-            { id: 6, name: "Analista 06", level: "N2", startTime: 9, endTime: 18 },
-            { id: 7, name: "Analista 07", level: "N3", startTime: 10, endTime: 19 },
-            { id: 8, name: "Analista 08", level: "N3", startTime: 10, endTime: 19 },
-            { id: 9, name: "Analista 09", level: "N3", startTime: 10, endTime: 19 }
-        ];
-        
         document.addEventListener('DOMContentLoaded', function() {
             loadAnalystView();
             setupAutoRefresh();
@@ -394,36 +377,26 @@
         
         function loadAnalystView() {
             try {
-                // Carregar estado do sistema
-                const savedState = JSON.parse(localStorage.getItem('queue_state') || '{}');
-                const savedAnalysts = savedState.analysts || [];
-                const appState = savedState.appState || {};
+                // Obter dados do portal
+                const portal = window.portal;
+                if (!portal) {
+                    // Tentar carregar do localStorage
+                    loadFromLocalStorage();
+                    return;
+                }
                 
-                // Mesclar dados dos analistas com estado salvo
-                const analysts = window.analysts.map(baseAnalyst => {
-                    const savedAnalyst = savedAnalysts.find(a => a.id === baseAnalyst.id);
-                    return {
-                        ...baseAnalyst,
-                        isAvailable: savedAnalyst?.isAvailable || false,
-                        isBusy: savedAnalyst?.isBusy || false,
-                        currentTicket: savedAnalyst?.currentTicket || null,
-                        ticketStatus: savedAnalyst?.ticketStatus || null,
-                        ticketSpecialType: savedAnalyst?.ticketSpecialType || null,
-                        ticketsHandled: savedAnalyst?.ticketsHandled || 0,
-                        isWaitingForClient: savedAnalyst?.isWaitingForClient || false,
-                        lastActivity: savedAnalyst?.lastActivity || null,
-                        specialClient: savedAnalyst?.specialClient || null
-                    };
-                });
+                const analysts = portal.analysts || [];
+                const appState = portal.appState || {};
+                const queue = portal.queue || [];
                 
                 // Atualizar estatísticas
-                updateStatistics(analysts, appState);
+                updateStatistics(analysts, appState, queue);
                 
                 // Atualizar grid de analistas
                 updateAnalystGrid(analysts);
                 
                 // Atualizar fila de espera
-                updateWaitingQueue(savedState.queueOrder || []);
+                updateWaitingQueue(queue);
                 
                 // Atualizar clientes especiais
                 updateSpecialClients(analysts);
@@ -437,18 +410,40 @@
             }
         }
         
-        function updateStatistics(analysts, appState) {
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem('portal_payhub_state');
+                if (!saved) {
+                    showNotification('Nenhum dado disponível', 'warning');
+                    return;
+                }
+                
+                const state = JSON.parse(saved);
+                const analysts = state.analysts || [];
+                const appState = state.appState || {};
+                
+                updateStatistics(analysts, appState, []);
+                updateAnalystGrid(analysts);
+                updateWaitingQueue([]);
+                updateSpecialClients(analysts);
+                
+            } catch (error) {
+                console.error('Erro ao carregar do localStorage:', error);
+            }
+        }
+        
+        function updateStatistics(analysts, appState, queue) {
             const total = analysts.length;
             const available = analysts.filter(a => a.isAvailable && !a.isBusy).length;
             const busy = analysts.filter(a => a.isBusy).length;
             const todayTickets = appState.ticketsToday || 0;
-            const nextInQueue = appState.nextTicketNumber || 1000;
+            const nextInQueue = queue.length > 0 ? queue[0].name : '-';
             
             document.getElementById('totalAnalysts').textContent = total;
             document.getElementById('availableAnalysts').textContent = available;
             document.getElementById('busyAnalysts').textContent = busy;
             document.getElementById('todayTickets').textContent = todayTickets;
-            document.getElementById('nextInQueue').textContent = '#' + nextInQueue;
+            document.getElementById('nextInQueue').textContent = nextInQueue;
         }
         
         function updateAnalystGrid(analysts) {
@@ -542,25 +537,26 @@
             grid.innerHTML = html;
         }
         
-        function updateWaitingQueue(queueOrder) {
+        function updateWaitingQueue(queue) {
             const waitingContainer = document.getElementById('waitingQueue');
             const waitingCount = document.getElementById('waitingCount');
             
-            if (!queueOrder || queueOrder.length === 0) {
-                waitingContainer.innerHTML = '<div class="empty-state">Nenhum ticket aguardando na fila</div>';
+            if (!queue || queue.length === 0) {
+                waitingContainer.innerHTML = '<div class="empty-state">Nenhum analista na fila de espera</div>';
                 waitingCount.textContent = '0 aguardando';
                 return;
             }
             
-            waitingCount.textContent = `${queueOrder.length} aguardando`;
+            waitingCount.textContent = `${queue.length} aguardando`;
             
             let html = '<div class="waiting-list">';
-            queueOrder.forEach((ticket, index) => {
+            queue.forEach((analyst, index) => {
                 html += `
                     <div class="waiting-item">
-                        <div style="font-weight: 500; color: #212529;">Ticket #${ticket.number}</div>
+                        <div style="font-weight: 500; color: #212529;">${index + 1}. ${analyst.name}</div>
                         <div style="font-size: 11px; color: #6c757d;">
-                            ${ticket.type || 'Normal'} • Posição: ${index + 1}
+                            ${analyst.startTime}h-${analyst.endTime}h • 
+                            ${analyst.ticketsHandled || 0} tickets hoje
                         </div>
                     </div>
                 `;
