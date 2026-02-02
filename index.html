@@ -16,62 +16,118 @@
             <div class="current-time" id="currentTime"></div>
         </header>
 
-        <div class="controls">
-            <div class="control-group">
-                <h3><i class="fas fa-user-plus"></i> Novo Chamado</h3>
-                <input type="text" id="clienteInput" placeholder="Nome do Cliente" list="clientesList">
-                <datalist id="clientesList">
-                    <option value="Cliente Comum">
-                    <option value="Benoit">
-                    <option value="TIM">
-                    <option value="DPSP">
-                </datalist>
-                <button onclick="adicionarChamado()" class="btn-add">
-                    <i class="fas fa-plus"></i> Adicionar à Fila
-                </button>
+        <div class="main-layout">
+            <!-- COLUNA ESQUERDA -->
+            <div class="left-column">
+                <!-- NOVO CHAMADO -->
+                <div class="card novo-chamado">
+                    <h2><i class="fas fa-plus-circle"></i> Novo Chamado</h2>
+                    <div class="form-group">
+                        <label for="numeroChamado">Número do Chamado</label>
+                        <input type="text" id="numeroChamado" placeholder="Auto-incremento" readonly>
+                        <div class="numero-info">Número gerado automaticamente</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="clienteInput">Nome do Cliente</label>
+                        <input type="text" id="clienteInput" placeholder="Digite o nome do cliente" list="clientesList">
+                        <datalist id="clientesList">
+                            <option value="Cliente Comum">
+                            <option value="Benoit">
+                            <option value="TIM">
+                            <option value="DPSP">
+                        </datalist>
+                    </div>
+                    <button onclick="adicionarChamado()" class="btn-add-full">
+                        <i class="fas fa-plus"></i> Adicionar à Fila
+                    </button>
+                </div>
+
+                <!-- PRÓXIMOS DA FILA -->
+                <div class="card proximos-fila">
+                    <h2><i class="fas fa-clock"></i> Próximos da Fila</h2>
+                    <div class="fila-container">
+                        <div class="fila-header">
+                            <span>Pos.</span>
+                            <span>Nº Chamado</span>
+                            <span>Cliente</span>
+                            <span>Analista</span>
+                        </div>
+                        <div class="queue-list" id="filaList">
+                            <!-- Lista de próximos da fila será carregada aqui -->
+                        </div>
+                        <div class="proximo-indicador" id="proximoIndicador">
+                            <i class="fas fa-arrow-right"></i>
+                            <span>Próximo: <strong id="proximoAnalistaNome">-</strong></span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="control-group">
-                <h3><i class="fas fa-cog"></i> Configurações</h3>
-                <button onclick="reiniciarFila()" class="btn-reset">
-                    <i class="fas fa-redo"></i> Reiniciar Fila Hoje
-                </button>
-                <div class="status-indicator">
-                    <span class="status-dot active"></span>
-                    <span id="statusText">Conectado</span>
+            <!-- COLUNA DIREITA -->
+            <div class="right-column">
+                <!-- ANALISTAS EM ATENDIMENTO -->
+                <div class="card">
+                    <h2><i class="fas fa-user-tie"></i> Analistas em Atendimento</h2>
+                    <div class="analysts-grid" id="analistasAtendimento">
+                        <!-- Analistas em atendimento serão carregados aqui -->
+                    </div>
+                </div>
+
+                <!-- ANALISTAS DISPONÍVEIS -->
+                <div class="card">
+                    <h2><i class="fas fa-user-check"></i> Analistas Disponíveis</h2>
+                    <div class="analysts-grid" id="analistasDisponiveis">
+                        <!-- Analistas disponíveis serão carregados aqui -->
+                    </div>
+                </div>
+
+                <!-- CONTROLES -->
+                <div class="card controles-card">
+                    <div class="controles-grid">
+                        <button onclick="exibirConfiguracoes()" class="btn-control">
+                            <i class="fas fa-cog"></i> Configurações
+                        </button>
+                        <button onclick="reiniciarFila()" class="btn-control btn-reset">
+                            <i class="fas fa-redo"></i> Reiniciar Fila Hoje
+                        </button>
+                        <div class="status-indicator">
+                            <span class="status-dot active"></span>
+                            <span id="statusText">Conectado</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <main>
-            <div class="queue-section">
-                <h2><i class="fas fa-clock"></i> Próximos da Fila</h2>
-                <div class="queue-list" id="filaList">
-                    <!-- Lista de chamados em fila será carregada aqui -->
+    <!-- MODAL CONFIGURAÇÕES -->
+    <div class="modal" id="configModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-cog"></i> Configurações</h2>
+                <button onclick="fecharConfiguracoes()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="config-section">
+                    <h3>Regras do Sistema</h3>
+                    <ul class="regras-lista">
+                        <li><strong>Horários:</strong> Eric (8h-17h), Carolina/Cristiane/Tamiris/André/Felipe (9h-18h), Sander/Yan (14h-23h)</li>
+                        <li><strong>Clientes Especiais:</strong> Benoit → André, TIM → Eric, DPSP → Felipe</li>
+                        <li><strong>Rodízio:</strong> Ordem dos 8 analistas, continua no dia seguinte</li>
+                        <li><strong>Aguardando Retorno:</strong> Analista volta para o final da fila</li>
+                    </ul>
+                </div>
+                <div class="config-section">
+                    <h3>Contador de Chamados</h3>
+                    <div class="contador-info">
+                        <div>Último número gerado hoje:</div>
+                        <div class="contador-numero" id="contadorNumero">0</div>
+                    </div>
+                    <button onclick="resetarContador()" class="btn-reset-small">
+                        <i class="fas fa-sync-alt"></i> Resetar Contador
+                    </button>
                 </div>
             </div>
-
-            <div class="analysts-section">
-                <h2><i class="fas fa-user-tie"></i> Analistas em Atendimento</h2>
-                <div class="analysts-grid" id="analistasAtendimento">
-                    <!-- Analistas em atendimento serão carregados aqui -->
-                </div>
-
-                <h2><i class="fas fa-user-check"></i> Analistas Disponíveis</h2>
-                <div class="analysts-grid" id="analistasDisponiveis">
-                    <!-- Analistas disponíveis serão carregados aqui -->
-                </div>
-            </div>
-        </main>
-
-        <div class="rules-info">
-            <h3><i class="fas fa-info-circle"></i> Regras do Sistema</h3>
-            <ul>
-                <li><strong>Horários:</strong> Eric (8h-17h), Carolina/Cristiane/Tamiris/André/Felipe (9h-18h), Sander/Yan (14h-23h)</li>
-                <li><strong>Clientes Especiais:</strong> Benoit → André, TIM → Eric, DPSP → Felipe</li>
-                <li><strong>Rodízio:</strong> Ordem dos 8 analistas, continua no dia seguinte</li>
-                <li><strong>Aguardando Retorno:</strong> Analista volta para o final da fila</li>
-            </ul>
         </div>
     </div>
 
