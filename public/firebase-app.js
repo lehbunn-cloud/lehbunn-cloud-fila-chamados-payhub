@@ -1,5 +1,5 @@
 // ============================================
-// INTEGRAÇÃO FIREBASE - PERSISTÊNCIA COMPLETA
+// INTEGRAÇÃO FIREBASE - PORTAL PAYHUB
 // ============================================
 
 class FirebaseAppIntegration {
@@ -9,26 +9,18 @@ class FirebaseAppIntegration {
         this.initialized = false;
         this.sessionId = null;
         this.lastSaveTime = null;
+        this.analysts = [];
         this.init();
     }
 
     async init() {
+        console.log('🔧 Inicializando Firebase App Integration...');
+        
         try {
-            console.log('🔧 Inicializando Firebase App Integration...');
+            // Aguardar carregamento do Firebase
+            await this.waitForFirebase();
             
-            // Aguardar um pouco para garantir carregamento
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Verificar se Firebase está disponível
-            if (typeof firebase === 'undefined') {
-                throw new Error('Firebase SDK não carregado');
-            }
-            
-            // Aguardar configuração
-            if (!window.firebaseConfig) {
-                await this.waitForConfig();
-            }
-            
+            // Obter referências
             const refs = window.firebaseConfig?.getFirebaseRefs();
             if (!refs || !refs.db) {
                 throw new Error('Firebase não disponível');
@@ -37,7 +29,10 @@ class FirebaseAppIntegration {
             this.db = refs.db;
             this.auth = refs.auth;
             this.initialized = true;
-            this.sessionId = this.getSessionId();
+            this.sessionId = this.generateSessionId();
+            
+            // Salvar session ID
+            sessionStorage.setItem('queue_session_id', this.sessionId);
             
             console.log('✅ Firebase App Integration inicializado');
             console.log('📝 Sessão:', this.sessionId);
@@ -45,17 +40,39 @@ class FirebaseAppIntegration {
             // Testar conexão
             await this.testConnection();
             
-            // Sincronizar tickets offline
-            await this.syncOfflineTickets();
+            // Carregar analistas
+            await this.loadAnalysts();
             
             return true;
             
         } catch (error) {
-            console.error('❌ Erro ao inicializar:', error.message);
+            console.error('❌ Erro ao inicializar Firebase:', error.message);
             this.initialized = false;
             this.setupOfflineMode();
             return false;
         }
+    }
+
+    async waitForFirebase() {
+        return new Promise((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 20;
+            
+            const checkInterval = setInterval(() => {
+                attempts++;
+                
+                if (window.firebaseConfig && window.firebaseConfig.getFirebaseRefs) {
+                    clearInterval(checkInterval);
+                    resolve();
+                    return;
+                }
+                
+                if (attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    reject(new Error('Timeout aguardando Firebase'));
+                }
+            }, 500);
+        });
     }
 
     async testConnection() {
@@ -84,6 +101,9 @@ class FirebaseAppIntegration {
         console.warn('⚠️ Configurando modo offline');
         this.initialized = false;
         
+        // Carregar analistas padrão
+        this.loadDefaultAnalysts();
+        
         // Mostrar notificação
         if (typeof showNotification === 'function') {
             setTimeout(() => {
@@ -92,135 +112,301 @@ class FirebaseAppIntegration {
         }
     }
 
-    async waitForConfig() {
-        return new Promise((resolve, reject) => {
-            let attempts = 0;
-            const maxAttempts = 30;
-            
-            const checkInterval = setInterval(() => {
-                attempts++;
-                
-                if (window.firebaseConfig && window.firebaseConfig.getFirebaseRefs) {
-                    clearInterval(checkInterval);
-                    resolve();
-                } else if (attempts >= maxAttempts) {
-                    clearInterval(checkInterval);
-                    reject(new Error('Timeout aguardando Firebase'));
-                }
-            }, 100);
-        });
+    generateSessionId() {
+        let sessionId = sessionStorage.getItem('queue_session_id');
+        if (!sessionId) {
+            sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            sessionStorage.setItem('queue_session_id', sessionId);
+        }
+        return sessionId;
     }
 
     // ============================================
-    // PERSISTÊNCIA DE ESTADO COMPLETO - CORRIGIDA
+    // GERENCIAMENTO DE ANALISTAS
     // ============================================
 
-    async saveFullState(stateData) {
+    async loadAnalysts() {
         if (!this.initialized || !this.db) {
-            console.warn('⚠️ Firebase não disponível, salvando localmente');
+            this.loadDefaultAnalysts();
+            return;
+        }
+
+        try {
+            const snapshot = await this.db.collection('analysts').get();
+            
+            if (snapshot.empty) {
+                console.log('📭 Nenhum analista encontrado no Firebase, usando padrão');
+                this.loadDefaultAnalysts();
+                return;
+            }
+            
+            this.analysts = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                this.analysts.push({
+                    id: data.id,
+                    name: data.name,
+                    level: data.level,
+                    startTime: data.startTime,
+                    endTime: data.endTime,
+                    specialClient: data.specialClient || null,
+                    isActive: data.isActive !== false,
+                    shift: data.shift || 'integral',
+                    isAvailable: data.isAvailable || false,
+                    isBusy: data.isBusy || false,
+                    currentTicket: data.currentTicket || null,
+                    ticketStatus: data.ticketStatus || null,
+                    ticketSpecialType: data.ticketSpecialType || null,
+                    ticketsHandled: data.ticketsHandled || 0,
+                    isWaitingForClient: data.isWaitingForClient || false,
+                    inQueue: data.inQueue !== false,
+                    lastActivity: data.lastActivity || null,
+                    createdAt: data.createdAt || new Date().toISOString(),
+                    updatedAt: data.updatedAt || new Date().toISOString()
+                });
+            });
+            
+            console.log(`✅ ${this.analysts.length} analistas carregados do Firebase`);
+            
+        } catch (error) {
+            console.error('❌ Erro ao carregar analistas:', error);
+            this.loadDefaultAnalysts();
+        }
+    }
+
+    loadDefaultAnalysts() {
+        this.analysts = [
+            {
+                id: 1,
+                name: "Eric",
+                level: "N1",
+                startTime: 8,
+                endTime: 17,
+                specialClient: "TIM",
+                isActive: true,
+                shift: "manhã",
+                isAvailable: false,
+                isBusy: false,
+                currentTicket: null,
+                ticketsHandled: 0,
+                inQueue: true,
+                lastActivity: null
+            },
+            {
+                id: 2,
+                name: "Carolina",
+                level: "N1",
+                startTime: 9,
+                endTime: 18,
+                specialClient: null,
+                isActive: true,
+                shift: "manhã",
+                isAvailable: false,
+                isBusy: false,
+                currentTicket: null,
+                ticketsHandled: 0,
+                inQueue: true,
+                lastActivity: null
+            },
+            {
+                id: 3,
+                name: "Tamiris",
+                level: "N1",
+                startTime: 9,
+                endTime: 18,
+                specialClient: null,
+                isActive: true,
+                shift: "manhã",
+                isAvailable: false,
+                isBusy: false,
+                currentTicket: null,
+                ticketsHandled: 0,
+                inQueue: true,
+                lastActivity: null
+            },
+            {
+                id: 4,
+                name: "Cristiane",
+                level: "N1",
+                startTime: 9,
+                endTime: 18,
+                specialClient: null,
+                isActive: true,
+                shift: "manhã",
+                isAvailable: false,
+                isBusy: false,
+                currentTicket: null,
+                ticketsHandled: 0,
+                inQueue: true,
+                lastActivity: null
+            },
+            {
+                id: 5,
+                name: "Jonathan",
+                level: "N1",
+                startTime: 8,
+                endTime: 17,
+                specialClient: null,
+                isActive: true,
+                shift: "manhã",
+                isAvailable: false,
+                isBusy: false,
+                currentTicket: null,
+                ticketsHandled: 0,
+                inQueue: true,
+                lastActivity: null
+            },
+            {
+                id: 6,
+                name: "Sander",
+                level: "N1",
+                startTime: 14,
+                endTime: 23,
+                specialClient: null,
+                isActive: true,
+                shift: "tarde",
+                isAvailable: false,
+                isBusy: false,
+                currentTicket: null,
+                ticketsHandled: 0,
+                inQueue: true,
+                lastActivity: null
+            },
+            {
+                id: 7,
+                name: "Yan",
+                level: "N1",
+                startTime: 14,
+                endTime: 23,
+                specialClient: null,
+                isActive: true,
+                shift: "tarde",
+                isAvailable: false,
+                isBusy: false,
+                currentTicket: null,
+                ticketsHandled: 0,
+                inQueue: true,
+                lastActivity: null
+            },
+            {
+                id: 8,
+                name: "André",
+                level: "N1",
+                startTime: 8,
+                endTime: 18,
+                specialClient: "Benoit",
+                isActive: true,
+                shift: "integral",
+                isAvailable: false,
+                isBusy: false,
+                currentTicket: null,
+                ticketsHandled: 0,
+                inQueue: true,
+                lastActivity: null
+            },
+            {
+                id: 9,
+                name: "Felipe",
+                level: "N1",
+                startTime: 8,
+                endTime: 18,
+                specialClient: "DPSP",
+                isActive: true,
+                shift: "integral",
+                isAvailable: false,
+                isBusy: false,
+                currentTicket: null,
+                ticketsHandled: 0,
+                inQueue: true,
+                lastActivity: null
+            }
+        ];
+        
+        console.log(`📋 ${this.analysts.length} analistas padrão carregados`);
+    }
+
+    async saveAnalysts() {
+        if (!this.initialized || !this.db) {
+            console.warn('⚠️ Firebase não disponível para salvar analistas');
             return false;
         }
 
         try {
-            const sessionId = stateData.sessionId || this.sessionId;
-            if (!sessionId) {
-                console.error('❌ Sem sessionId para salvar estado');
-                return false;
-            }
+            const batch = this.db.batch();
+            
+            this.analysts.forEach(analyst => {
+                const analystRef = this.db.collection('analysts').doc(`analyst_${analyst.id}`);
+                batch.set(analystRef, {
+                    ...analyst,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+            });
+            
+            await batch.commit();
+            console.log(`✅ ${this.analysts.length} analistas salvos no Firebase`);
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Erro ao salvar analistas:', error);
+            return false;
+        }
+    }
 
-            const stateRef = this.db.collection('queue_states').doc(sessionId);
+    async updateAnalyst(analystId, updates) {
+        if (!this.initialized || !this.db) {
+            // Atualizar localmente
+            const index = this.analysts.findIndex(a => a.id === analystId);
+            if (index !== -1) {
+                this.analysts[index] = { ...this.analysts[index], ...updates };
+            }
+            return true;
+        }
+
+        try {
+            const analystRef = this.db.collection('analysts').doc(`analyst_${analystId}`);
+            await analystRef.update({
+                ...updates,
+                updatedAt: new Date().toISOString()
+            });
             
-            const saveData = {
-                ...stateData,
-                sessionId: sessionId,
-                savedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                version: stateData.version || '3.5.0'
-            };
-            
-            await stateRef.set(saveData, { merge: true });
-            
-            this.lastSaveTime = new Date();
-            console.log('✅ Estado salvo no Firebase');
+            // Atualizar localmente também
+            const index = this.analysts.findIndex(a => a.id === analystId);
+            if (index !== -1) {
+                this.analysts[index] = { ...this.analysts[index], ...updates };
+            }
             
             return true;
             
         } catch (error) {
-            console.error('❌ Erro ao salvar estado:', error);
+            console.error('❌ Erro ao atualizar analista:', error);
             return false;
         }
     }
 
-    async loadFullState() {
-        if (!this.initialized || !this.db) {
-            console.warn('⚠️ Firebase não disponível, carregando localmente');
-            return null;
-        }
+    getAnalysts() {
+        return this.analysts;
+    }
 
-        try {
-            const sessionId = this.getSessionId();
-            if (!sessionId) {
-                console.error('❌ Sem sessionId para carregar estado');
-                return null;
-            }
+    getAnalystById(id) {
+        return this.analysts.find(a => a.id === id);
+    }
 
-            // Tentar carregar pela sessão atual
-            let stateRef = this.db.collection('queue_states').doc(sessionId);
-            let doc = await stateRef.get();
-            
-            if (!doc.exists) {
-                // Buscar estado mais recente
-                console.log('ℹ️ Buscando estado mais recente...');
-                const snapshot = await this.db.collection('queue_states')
-                    .orderBy('savedAt', 'desc')
-                    .limit(1)
-                    .get();
-                
-                if (snapshot.empty) {
-                    console.log('ℹ️ Nenhum estado encontrado');
-                    return null;
-                }
-                
-                doc = snapshot.docs[0];
-                console.log('✅ Estado mais recente encontrado');
-            }
-            
-            const stateData = doc.data();
-            
-            // Validar estrutura básica
-            if (!stateData.appState || !stateData.analysts) {
-                console.error('❌ Estrutura de estado inválida');
-                return null;
-            }
-            
-            console.log('📂 Estado carregado do Firebase:', {
-                version: stateData.version,
-                tickets: stateData.appState.ticketsToday || 0,
-                analysts: stateData.analysts.length || 0
-            });
-            
-            return stateData;
-            
-        } catch (error) {
-            console.error('❌ Erro ao carregar estado:', error);
-            return null;
-        }
+    getAnalystByName(name) {
+        return this.analysts.find(a => a.name === name);
     }
 
     // ============================================
-    // FUNÇÕES PARA TICKETS - CORRIGIDAS!
+    // GESTÃO DE TICKETS
     // ============================================
 
-    async saveTicketToFirebase(ticketNumber, analystName, status = 'iniciado', clientType = 'normal') {
+    async saveTicket(ticketNumber, analystName, status = 'iniciado', clientType = 'normal') {
         if (!this.initialized || !this.db) {
-            console.warn('⚠️ Firebase não disponível, salvando localmente');
-            this.saveTicketLocally(ticketNumber, analystName, status, clientType);
+            this.saveTicketLocal(ticketNumber, analystName, status, clientType);
             return null;
         }
 
         try {
-            // Criar ID único para o ticket
-            const ticketId = `ticket_${ticketNumber}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const ticketId = `ticket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
             const ticketData = {
                 ticketId: ticketId,
@@ -235,34 +421,29 @@ class FirebaseAppIntegration {
                 synced: true
             };
 
-            // SALVAR no Firebase
             const ticketRef = this.db.collection('tickets').doc(ticketId);
             await ticketRef.set(ticketData);
             
-            console.log(`✅ Ticket ${ticketNumber} salvo no Firebase (ID: ${ticketId})`);
+            console.log(`✅ Ticket ${ticketNumber} salvo no Firebase`);
             
-            // Também salvar localmente como backup
-            this.saveTicketLocally(ticketNumber, analystName, status, clientType);
+            // Salvar localmente como backup
+            this.saveTicketLocal(ticketNumber, analystName, status, clientType);
             
             return ticketId;
             
         } catch (error) {
             console.error('❌ Erro ao salvar ticket:', error);
-            this.saveTicketLocally(ticketNumber, analystName, status, clientType);
+            this.saveTicketLocal(ticketNumber, analystName, status, clientType);
             return null;
         }
     }
 
-    async updateTicketStatus(ticketNumber, status, analystName = null) {
+    async updateTicket(ticketNumber, status, analystName = null) {
         if (!this.initialized || !this.db) {
-            console.warn('⚠️ Firebase não disponível');
             return false;
         }
 
         try {
-            console.log(`🔄 Atualizando ticket ${ticketNumber} para status: ${status}`);
-            
-            // Buscar o ticket mais recente com este número
             const ticketsRef = this.db.collection('tickets');
             const querySnapshot = await ticketsRef
                 .where('ticketNumber', '==', ticketNumber.toString())
@@ -272,35 +453,10 @@ class FirebaseAppIntegration {
                 .get();
             
             if (querySnapshot.empty) {
-                console.warn(`⚠️ Ticket ${ticketNumber} não encontrado. Buscando qualquer ticket com este número...`);
-                
-                // Buscar qualquer ticket com este número (fallback)
-                const fallbackSnapshot = await ticketsRef
-                    .where('ticketNumber', '==', ticketNumber.toString())
-                    .orderBy('createdAt', 'desc')
-                    .limit(1)
-                    .get();
-                
-                if (fallbackSnapshot.empty) {
-                    console.error(`❌ Ticket ${ticketNumber} não encontrado em nenhum status`);
-                    return false;
-                }
-                
-                const ticketDoc = fallbackSnapshot.docs[0];
-                return await this.updateTicketDoc(ticketDoc, status, analystName);
+                return false;
             }
 
             const ticketDoc = querySnapshot.docs[0];
-            return await this.updateTicketDoc(ticketDoc, status, analystName);
-            
-        } catch (error) {
-            console.error('❌ Erro ao atualizar ticket:', error);
-            return false;
-        }
-    }
-
-    async updateTicketDoc(ticketDoc, status, analystName = null) {
-        try {
             const updateData = {
                 status: status,
                 updatedAt: new Date().toISOString()
@@ -313,7 +469,7 @@ class FirebaseAppIntegration {
                 if (ticketData.startTime) {
                     const startTime = new Date(ticketData.startTime);
                     const endTime = new Date();
-                    updateData.duration = Math.round((endTime - startTime) / 1000); // segundos
+                    updateData.duration = Math.round((endTime - startTime) / 1000);
                 }
             }
 
@@ -322,20 +478,161 @@ class FirebaseAppIntegration {
             }
 
             await ticketDoc.ref.update(updateData);
-            console.log(`✅ Ticket ${ticketDoc.data().ticketNumber} atualizado para status: ${status}`);
+            console.log(`✅ Ticket ${ticketNumber} atualizado para: ${status}`);
             return true;
             
         } catch (error) {
-            console.error('❌ Erro ao atualizar documento:', error);
+            console.error('❌ Erro ao atualizar ticket:', error);
             return false;
         }
     }
 
+    saveTicketLocal(ticketNumber, analystName, status, clientType) {
+        try {
+            const tickets = JSON.parse(localStorage.getItem('offline_tickets') || '[]');
+            const ticketData = {
+                ticketNumber,
+                analystName,
+                status,
+                clientType,
+                timestamp: new Date().toISOString(),
+                synced: false
+            };
+            
+            tickets.push(ticketData);
+            
+            if (tickets.length > 100) {
+                tickets.splice(0, tickets.length - 100);
+            }
+            
+            localStorage.setItem('offline_tickets', JSON.stringify(tickets));
+            console.log(`📱 Ticket ${ticketNumber} salvo localmente`);
+        } catch (error) {
+            console.error('❌ Erro ao salvar ticket localmente:', error);
+        }
+    }
+
     // ============================================
-    // FUNÇÕES DE RELATÓRIO
+    // FILA E RODÍZIO
     // ============================================
 
-    async generateCSVReport(startDate, endDate, includeAll = false) {
+    organizeQueue() {
+        const now = new Date();
+        const currentHour = now.getHours();
+        
+        // Filtrar analistas disponíveis no horário atual
+        const availableAnalysts = this.analysts.filter(analyst => {
+            // Verificar horário
+            const inTime = currentHour >= analyst.startTime && currentHour < analyst.endTime;
+            if (!inTime) return false;
+            
+            // Verificar disponibilidade
+            return analyst.isActive && !analyst.isBusy && analyst.inQueue;
+        });
+        
+        // Ordenar por:
+        // 1. Horário de início (mais cedo primeiro)
+        // 2. Menos tickets atendidos hoje
+        // 3. Nome (ordem alfabética)
+        return availableAnalysts.sort((a, b) => {
+            if (a.startTime !== b.startTime) {
+                return a.startTime - b.startTime;
+            }
+            
+            if (a.ticketsHandled !== b.ticketsHandled) {
+                return a.ticketsHandled - b.ticketsHandled;
+            }
+            
+            return a.name.localeCompare(b.name);
+        });
+    }
+
+    getNextAnalyst() {
+        const queue = this.organizeQueue();
+        
+        if (queue.length === 0) {
+            return null;
+        }
+        
+        // Obter último índice usado
+        const lastIndex = parseInt(localStorage.getItem('last_queue_index') || '0');
+        let nextIndex = lastIndex % queue.length;
+        
+        // Verificar se o analista ainda está disponível
+        const nextAnalyst = queue[nextIndex];
+        if (!nextAnalyst || !nextAnalyst.isActive || nextAnalyst.isBusy) {
+            // Avançar para o próximo disponível
+            nextIndex = (nextIndex + 1) % queue.length;
+        }
+        
+        // Salvar novo índice
+        localStorage.setItem('last_queue_index', (nextIndex + 1).toString());
+        
+        return queue[nextIndex];
+    }
+
+    // ============================================
+    // CLIENTES ESPECIAIS
+    // ============================================
+
+    isSpecialClient(clientType) {
+        const specialClients = ['TIM', 'DPSP', 'Benoit'];
+        return specialClients.includes(clientType);
+    }
+
+    getAnalystForSpecialClient(clientType) {
+        const mapping = {
+            'TIM': 'Eric',
+            'DPSP': 'Felipe',
+            'Benoit': 'André'
+        };
+        
+        const analystName = mapping[clientType];
+        return this.getAnalystByName(analystName);
+    }
+
+    // ============================================
+    // RELATÓRIOS
+    // ============================================
+
+    async getTicketsByDateRange(startDate, endDate, includeAll = false) {
+        if (!this.initialized || !this.db) {
+            return [];
+        }
+
+        try {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            
+            let query = this.db.collection('tickets')
+                .where('createdAt', '>=', start.toISOString())
+                .where('createdAt', '<=', end.toISOString());
+
+            if (!includeAll) {
+                query = query.where('clientType', '!=', 'normal');
+            }
+
+            const querySnapshot = await query.orderBy('createdAt', 'asc').get();
+            
+            const tickets = [];
+            querySnapshot.forEach(doc => {
+                tickets.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+
+            console.log(`📊 Encontrados ${tickets.length} tickets no período`);
+            return tickets;
+            
+        } catch (error) {
+            console.error('❌ Erro ao buscar tickets:', error);
+            return [];
+        }
+    }
+
+    async generateReport(startDate, endDate, includeAll = false) {
         const tickets = await this.getTicketsByDateRange(startDate, endDate, includeAll);
         
         if (tickets.length === 0) {
@@ -372,150 +669,7 @@ class FirebaseAppIntegration {
         return csvRows.join('\n');
     }
 
-    async getTicketsByDateRange(startDate, endDate, includeAll = false) {
-        if (!this.initialized || !this.db) {
-            console.warn('⚠️ Firebase não disponível para consulta');
-            return [];
-        }
-
-        try {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            
-            let query = this.db.collection('tickets')
-                .where('createdAt', '>=', start.toISOString())
-                .where('createdAt', '<=', end.toISOString());
-
-            if (!includeAll) {
-                query = query.where('clientType', '!=', 'normal');
-            }
-
-            const querySnapshot = await query.orderBy('createdAt', 'asc').get();
-            
-            const tickets = [];
-            querySnapshot.forEach(doc => {
-                tickets.push({
-                    id: doc.id,
-                    ...doc.data()
-                });
-            });
-
-            console.log(`📊 Encontrados ${tickets.length} tickets no período`);
-            return tickets;
-            
-        } catch (error) {
-            console.error('❌ Erro ao buscar tickets:', error);
-            return [];
-        }
-    }
-
-    // ============================================
-    // FUNÇÕES AUXILIARES
-    // ============================================
-
-    getSessionId() {
-        let sessionId = sessionStorage.getItem('queue_session_id');
-        if (!sessionId) {
-            sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            sessionStorage.setItem('queue_session_id', sessionId);
-        }
-        return sessionId;
-    }
-
-    saveTicketLocally(ticketNumber, analystName, status, clientType) {
-        try {
-            const tickets = JSON.parse(localStorage.getItem('offline_tickets') || '[]');
-            const ticketData = {
-                ticketNumber,
-                analystName,
-                status,
-                clientType,
-                timestamp: new Date().toISOString(),
-                synced: false
-            };
-            
-            // Verificar se já existe (para evitar duplicação)
-            const exists = tickets.some(t => 
-                t.ticketNumber === ticketNumber && 
-                t.status === status && 
-                Math.abs(new Date(t.timestamp) - new Date(ticketData.timestamp)) < 60000 // 1 minuto
-            );
-            
-            if (!exists) {
-                tickets.push(ticketData);
-                
-                if (tickets.length > 100) {
-                    tickets.splice(0, tickets.length - 100);
-                }
-                
-                localStorage.setItem('offline_tickets', JSON.stringify(tickets));
-                console.log(`📱 Ticket ${ticketNumber} salvo localmente`);
-            }
-        } catch (error) {
-            console.error('❌ Erro ao salvar ticket localmente:', error);
-        }
-    }
-
-    async syncOfflineTickets() {
-        if (!this.initialized || !this.db) return;
-        
-        try {
-            const offlineTickets = JSON.parse(localStorage.getItem('offline_tickets') || '[]');
-            const pendingTickets = offlineTickets.filter(t => !t.synced);
-            
-            if (pendingTickets.length === 0) return;
-            
-            console.log(`🔄 Sincronizando ${pendingTickets.length} tickets offline...`);
-            
-            let syncedCount = 0;
-            for (const ticket of pendingTickets) {
-                try {
-                    const ticketId = `offline_${ticket.ticketNumber}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                    
-                    await this.db.collection('tickets').doc(ticketId).set({
-                        ticketId: ticketId,
-                        ticketNumber: ticket.ticketNumber,
-                        analystName: ticket.analystName,
-                        status: ticket.status,
-                        clientType: ticket.clientType,
-                        startTime: ticket.timestamp,
-                        createdAt: ticket.timestamp,
-                        updatedAt: new Date().toISOString(),
-                        synced: true,
-                        source: 'offline_sync'
-                    });
-                    
-                    ticket.synced = true;
-                    syncedCount++;
-                    
-                } catch (error) {
-                    console.error(`❌ Erro ao sincronizar ticket ${ticket.ticketNumber}:`, error);
-                }
-            }
-            
-            localStorage.setItem('offline_tickets', JSON.stringify(offlineTickets));
-            
-            if (syncedCount > 0) {
-                console.log(`✅ ${syncedCount} tickets offline sincronizados`);
-            }
-            
-        } catch (error) {
-            console.error('❌ Erro na sincronização:', error);
-        }
-    }
-
-    formatDate(dateString) {
-        if (!dateString) return '';
-        try {
-            const date = new Date(dateString);
-            return date.toLocaleString('pt-BR');
-        } catch (error) {
-            return dateString;
-        }
-    }
-
-    downloadCSV(csvString, filename = 'relatorio_chamados.csv') {
+    downloadCSV(csvString, filename) {
         if (!csvString) {
             console.error('❌ Nenhum dado para exportar');
             return false;
@@ -544,6 +698,20 @@ class FirebaseAppIntegration {
         }
     }
 
+    // ============================================
+    // FUNÇÕES AUXILIARES
+    // ============================================
+
+    formatDate(dateString) {
+        if (!dateString) return '';
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleString('pt-BR');
+        } catch (error) {
+            return dateString;
+        }
+    }
+
     isInitialized() {
         return this.initialized;
     }
@@ -552,7 +720,8 @@ class FirebaseAppIntegration {
         return {
             initialized: this.initialized,
             sessionId: this.sessionId,
-            lastSaveTime: this.lastSaveTime
+            lastSaveTime: this.lastSaveTime,
+            analystsCount: this.analysts.length
         };
     }
 }
@@ -563,61 +732,11 @@ class FirebaseAppIntegration {
 
 window.firebaseAppIntegration = new FirebaseAppIntegration();
 
-// Função de teste aprimorada
-window.testFirebaseIntegration = async function() {
-    console.log('🧪 Testando Firebase Integration...');
-    
-    const integration = window.firebaseAppIntegration;
-    if (!integration.initialized) {
-        console.error('❌ Firebase não inicializado');
-        return false;
-    }
+// Funções globais
+window.getFirebaseIntegration = () => window.firebaseAppIntegration;
+window.getAnalysts = () => window.firebaseAppIntegration.getAnalysts();
+window.getNextAnalyst = () => window.firebaseAppIntegration.getNextAnalyst();
+window.isSpecialClient = (clientType) => window.firebaseAppIntegration.isSpecialClient(clientType);
+window.getAnalystForSpecialClient = (clientType) => window.firebaseAppIntegration.getAnalystForSpecialClient(clientType);
 
-    try {
-        // Teste 1: Salvar ticket de teste
-        const testTicketNumber = 'TEST_' + Date.now();
-        const testId = await integration.saveTicketToFirebase(
-            testTicketNumber,
-            'Test Analyst',
-            'iniciado',
-            'test'
-        );
-        
-        if (!testId) {
-            console.error('❌ Falha ao salvar ticket de teste');
-            return false;
-        }
-        
-        console.log('✅ Ticket de teste salvo:', testId);
-        
-        // Teste 2: Atualizar status
-        const updateSuccess = await integration.updateTicketStatus(
-            testTicketNumber,
-            'finalizado',
-            'Test Analyst'
-        );
-        
-        if (!updateSuccess) {
-            console.warn('⚠️ Falha ao atualizar ticket de teste');
-        } else {
-            console.log('✅ Ticket de teste atualizado');
-        }
-        
-        // Teste 3: Consultar tickets
-        const tickets = await integration.getTicketsByDateRange(
-            new Date().toISOString().split('T')[0],
-            new Date().toISOString().split('T')[0],
-            true
-        );
-        
-        console.log('📊 Tickets encontrados:', tickets.length);
-        
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Erro no teste:', error);
-        return false;
-    }
-};
-
-console.log('✅ Firebase App Integration CORRIGIDO carregado');
+console.log('✅ Firebase App Integration carregado');
